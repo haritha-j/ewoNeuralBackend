@@ -6,6 +6,7 @@ import os
 import os.path
 import struct
 import h5py
+import json
 
 dataset_dir = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'dataset'))
 
@@ -208,11 +209,16 @@ def writeHDF5():
         meta_data = np.zeros(shape=(height, width, 1), dtype=np.uint8)
         # print type(img), img.shape
         # print type(meta_data), meta_data.shape
+
+        serializable_meta = {}
+
         clidx = 0  # current line index
         # dataset name (string)
         for i in range(len(data[idx]['dataset'])):
             meta_data[clidx][i] = ord(data[idx]['dataset'][i])
         clidx = clidx + 1
+        serializable_meta['dataset']=data[idx]['dataset']
+
         # image height, image width
         height_binary = float2bytes(data[idx]['img_height'])
         for i in range(len(height_binary)):
@@ -221,6 +227,9 @@ def writeHDF5():
         for i in range(len(width_binary)):
             meta_data[clidx][4 + i] = width_binary[i]
         clidx = clidx + 1
+        serializable_meta['img_height']=data[idx]['img_height']
+        serializable_meta['img_width']=data[idx]['img_width']
+
         # (a) isValidation(uint8), numOtherPeople (uint8), people_index (uint8), annolist_index (float), writeCount(float), totalWriteCount(float)
         meta_data[clidx][0] = data[idx]['isValidation']
         meta_data[clidx][1] = data[idx]['numOtherPeople']
@@ -242,16 +251,29 @@ def writeHDF5():
             meta_data[clidx][11 + i] = totalWriteCount_binary[i]
         nop = int(data[idx]['numOtherPeople'])
         clidx = clidx + 1
+        serializable_meta['isValidation']=data[idx]['isValidation']
+        serializable_meta['numOtherPeople'] = data[idx]['numOtherPeople']
+        serializable_meta['people_index'] = data[idx]['people_index']
+        serializable_meta['annolist_index'] = data[idx]['annolist_index']
+        serializable_meta['count'] = val_write_count if isValidation else tr_write_count
+        serializable_meta['total_count'] = val_total_write_count if isValidation else tr_total_write_count
+
+
         # (b) objpos_x (float), objpos_y (float)
         objpos_binary = float2bytes(data[idx]['objpos'])
         for i in range(len(objpos_binary)):
             meta_data[clidx][i] = objpos_binary[i]
         clidx = clidx + 1
+        serializable_meta['objpos']= [ data[idx]['objpos'] ]
+
+
         # (c) scale_provided (float)
         scale_provided_binary = float2bytes(data[idx]['scale_provided'])
         for i in range(len(scale_provided_binary)):
             meta_data[clidx][i] = scale_provided_binary[i]
         clidx = clidx + 1
+        serializable_meta['scale_provided'] = [ data[idx]['scale_provided'] ]
+
         # (d) joint_self (3*16) (float) (3 line)
         joints = np.asarray(data[idx]['joint_self']).T.tolist()  # transpose to 3*16
         for i in range(len(joints)):
@@ -259,6 +281,8 @@ def writeHDF5():
             for j in range(len(row_binary)):
                 meta_data[clidx][j] = row_binary[j]
             clidx = clidx + 1
+        serializable_meta['joints'] = [ data[idx]['joint_self'].tolist() ]
+
         # (e) check nop, prepare arrays
         if (nop != 0):
             joint_other = data[idx]['joint_others']
@@ -275,6 +299,9 @@ def writeHDF5():
             for j in range(len(scale_provided_other_binary)):
                 meta_data[clidx][j] = scale_provided_other_binary[j]
             clidx = clidx + 1
+            serializable_meta['objpos'] += data[idx]['objpos_other']
+            serializable_meta['scale_provided'] += data[idx]['scale_provided_other']
+
             # (h) joint_others (3*16) (float) (nop*3 lines)
             for n in range(nop):
                 joints = np.asarray(joint_other[n]).T.tolist()  # transpose to 3*16
@@ -283,8 +310,14 @@ def writeHDF5():
                     for j in range(len(row_binary)):
                         meta_data[clidx][j] = row_binary[j]
                     clidx = clidx + 1
+                serializable_meta['joints'].append(joint_other[n].tolist())
 
-        # print meta_data[0:12,0:48]
+        assert len(serializable_meta['joints']) == 1+nop, [ len(serializable_meta['joints']), 1+nop ]
+        assert len(serializable_meta['scale_provided']) == 1+nop, [ len(serializable_meta['scale_provided']), 1+nop ]
+        assert len(serializable_meta['objpos']) == 1+nop, [ len(serializable_meta['objpos']), 1+nop ]
+
+
+        # print(meta_data[0:(7+4*nop),0:48,0])
         # total 7+4*nop lines
         if "COCO" in data[idx]['dataset']:
             img4ch = np.concatenate((img, meta_data, mask_miss[..., None], mask_all[..., None]),
@@ -296,11 +329,13 @@ def writeHDF5():
 
         if isValidation:
             key = '%07d' % val_write_count
-            val_grp.create_dataset(key, data=img4ch, chunks=None)
+            ds = val_grp.create_dataset(key, data=img4ch, chunks=None)
+            ds.attrs['meta'] = json.dumps(serializable_meta)
             val_write_count += 1
         else:
             key = '%07d' % tr_write_count
-            tr_grp.create_dataset(key, data=img4ch, chunks=None)
+            ds = tr_grp.create_dataset(key, data=img4ch, chunks=None)
+            ds.attrs['meta'] = json.dumps(serializable_meta)
             tr_write_count += 1
 
         print('Writing sample %d/%d' % (count, numSample))

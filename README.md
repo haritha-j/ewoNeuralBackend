@@ -1,5 +1,30 @@
+### About this fork
+
+This fork contains **py_rmpe_server** pure - python version of **rmpe_dataset_server**.
+
+It will have significally less code, will be easy extendable for new parts/layers, and most probably will be significally faster
+(rmpe_dataset_server could processing 30 images/second on val dataset on my machine, current version of py_rmpe_server is 190 images/sec, but paf not yet implemented, just heatmaps, i.e. it will be slower, probably 120-150 images per second)
+
+#### Current status
+- [x] image augmentation: rotate, shift, scale, crop (implemented as single affine transform, i.e. much faster)
+- [ ] image augmentation: flip
+- [x] mask calculation: rotate, shift, scale, crop
+- [ ] mask calculation: flip
+- [x] joint heatmaps
+- [ ] limbs part affinity fields
+
+
+#### How to help
+- re-generate val_dataset.h5 with new version of generate_hdf5.py (will be backward compatible, just one attribute 'meta' added)
+- run ./py_rmpe_server.py (file names/ports are hardcoded, patch them if you need). server could run both val and training augmentation using fork.  
+- test result with **inspect_dataset.ipynb** 
+- look to the code and give feedback
+
+There is no point to try to run training yet, it will not work.
+
+
 # Realtime Multi-Person Pose Estimation
-This is a keras version of [Realtime Multi-Person Pose Estimation](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) project  
+This is a keras version of [Realtime Multi-Person Pose Estimation](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) project
 
 ## Introduction
 Code repo for reproducing [2017 CVPR](https://arxiv.org/abs/1611.08050) paper using keras.  

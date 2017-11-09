@@ -64,7 +64,7 @@ class DataGeneratorClient(object):
             data = self.socket.recv()
             buf = buffer_(data)
             array = np.frombuffer(buf, dtype=np.dtype(header['descr']))
-            array.shape = make_tuple(header['shape'])
+            array.shape = make_tuple(header['shape']) if isinstance(header['shape'], str) else header['shape']  # this need for comparability with C++ code, for some reasons it is string here, not tuple
 
             if header['fortran_order']:
                 array.shape = header['shape'][::-1]
@@ -72,6 +72,15 @@ class DataGeneratorClient(object):
             arrays.append(array)
 
         return arrays
+
+
+    def gen_raw(self):
+
+        # this function used for test purposes in py_rmpe_server
+        while True:
+            data_img, mask_img, label = tuple(self._recv_arrays())
+            yield data_img, mask_img, label
+
 
     def gen(self):
         batches_x, batches_x1, batches_x2, batches_y1, batches_y2 = \
