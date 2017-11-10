@@ -2,6 +2,13 @@
 
 import numpy as np
 
+def ltr_parts(parts_dict):
+    # when we flip image left parts became right parts and vice versa. This is the list of parts to exchange each other.
+    leftParts  = [ parts_dict[p] for p in ["Lsho", "Lelb", "Lwri", "Lhip", "Lkne", "Lank", "Leye", "Lear"] ]
+    rightParts = [ parts_dict[p] for p in ["Rsho", "Relb", "Rwri", "Rhip", "Rkne", "Rank", "Reye", "Rear"] ]
+    return leftParts,rightParts
+
+
 class RmpeGlobalConfig:
 
     width = 368
@@ -9,13 +16,15 @@ class RmpeGlobalConfig:
 
     mask_stride = 8
 
-
     parts = ["nose", "neck", "Rsho", "Relb", "Rwri", "Lsho", "Lelb", "Lwri", "Rhip", "Rkne", "Rank", "Lhip", "Lkne", "Lank", "Leye", "Reye", "Lear", "Rear"]
     num_parts = len(parts)
     parts_dict = dict(zip(parts, range(num_parts)))
-    print(parts_dict)
+    print(parts_dict["nose"])
     parts += ["background"]
     num_parts_with_background = len(parts)
+
+    leftParts, rightParts = ltr_parts(parts_dict)
+    print(leftParts, rightParts)
 
     # this numbers probably copied from matlab they are 1.. based not 0.. based
     limbs_conn = [[2,3], [2,6], [3,4], [4,5], [6,7], [7,8], [2,9], [9,10], \

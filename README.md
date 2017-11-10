@@ -6,10 +6,8 @@ It will have significally less code, will be easy extendable for new parts/layer
 (rmpe_dataset_server could processing 30 images/second on val dataset on my machine, current version of py_rmpe_server is 190 images/sec, but paf not yet implemented, just heatmaps, i.e. it will be slower, probably 120-150 images per second)
 
 #### Current status
-- [x] image augmentation: rotate, shift, scale, crop (implemented as single affine transform, i.e. much faster)
-- [ ] image augmentation: flip
-- [x] mask calculation: rotate, shift, scale, crop
-- [ ] mask calculation: flip
+- [x] image augmentation: rotate, shift, scale, crop, flip (implemented as single affine transform, i.e. much faster)
+- [x] mask calculation: rotate, shift, scale, crop, flip
 - [x] joint heatmaps
 - [ ] limbs part affinity fields
 

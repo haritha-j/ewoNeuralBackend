@@ -31,8 +31,11 @@ class Heatmapper:
     def put_gaussian_maps(self, heatmaps, layer, joints):
 
         # actually exp(a+b) = exp(a)*exp(b), lets use it calculating 2d exponent, it could just be calculated by
-        if layer == 0:
-            print("NOSES:", joints)
+        if layer == 4:
+            print("Rwri:", joints)
+
+        if layer == 7:
+            print("Lwri:", joints)
 
         for i in range(joints.shape[0]):
 
