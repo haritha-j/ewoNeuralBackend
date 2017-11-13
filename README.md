@@ -10,7 +10,7 @@ It have less code(19kb vs 35kb), and significantly faster (140 images/s vs 30 im
 - [x] joint heatmaps
 - [x] limbs part affinity fields
 - [x] tested using rmpe_server_tester.py, found some differences from C++ version, but looks like it is C++ code is buggy 
-- [ ] need to train model on it 
+- [ ] started training, hasn't finished yet 
 
 
 #### How to help
@@ -18,8 +18,8 @@ It have less code(19kb vs 35kb), and significantly faster (140 images/s vs 30 im
 - run ./py_rmpe_server.py (file names/ports are hardcoded, patch them if you need). server could run both val and training augmentation using fork.  
 - test result with **inspect_dataset.ipynb** 
 - look to the code and give feedback
+- try to train
 
-There is no point to try to run training yet, it will not work.
 
 
 # Realtime Multi-Person Pose Estimation
