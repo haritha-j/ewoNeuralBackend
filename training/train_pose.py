@@ -13,7 +13,7 @@ from keras.layers.convolutional import Conv2D
 from keras.applications.vgg19 import VGG19
 import keras.backend as K
 
-batch_size = 10
+batch_size = 50
 base_lr = 4e-5 # 2e-5
 momentum = 0.9
 weight_decay = 5e-4
@@ -122,7 +122,8 @@ for layer in model.layers:
 
 # euclidean loss as implemented in caffe https://github.com/BVLC/caffe/blob/master/src/caffe/layers/euclidean_loss_layer.cpp
 def eucl_loss(x, y):
-    return K.sum(K.square(x - y)) / batch_size / 2
+    l = K.sum(K.square(x - y)) / batch_size / 2
+    return l
 
 losses = {}
 losses["weight_stage1_L1"] = eucl_loss

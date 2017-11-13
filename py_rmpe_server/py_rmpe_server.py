@@ -44,7 +44,7 @@ class Server:
         print("%s: Child process init... " % self.name)
         self.init()
 
-        iterator = DataIterator(self.h5file)  # random=False - for test mode enabled
+        iterator = DataIterator(self.h5file, shuffle=False, augment=True)
 
         print("%s: Loop started... " % self.name)
 

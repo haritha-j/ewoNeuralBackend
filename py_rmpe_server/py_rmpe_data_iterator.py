@@ -9,21 +9,20 @@ import numpy as np
 
 class DataIterator:
 
-    def __init__(self, h5file, random=True):
+    def __init__(self, h5file, shuffle = True, augment = True):
 
         self.h5file = h5file
         self.h5 = h5py.File(self.h5file, "r")
         self.datum = self.h5['datum']
         self.heatmapper = Heatmapper()
-        self.random = random
+        self.augment = augment
+        self.shuffle = shuffle
 
     def iterate(self):
 
-        num=0
-
         keys = list(self.datum.keys())
 
-        if self.random:
+        if self.shuffle:
             random.shuffle(keys)
 
         for key in keys:
@@ -33,20 +32,14 @@ class DataIterator:
 
             print("[in] IMAGE:", image.shape, image.dtype, meta['img_path'])
             print("[in] MASK:", mask.shape, mask.dtype, meta['mask_miss_path'])
-            #print("[in] meta:", meta)
 
             debug['img_path']=meta['img_path']
             debug['mask_miss_path'] = meta['mask_miss_path']
             debug['mask_all_path'] = meta['mask_all_path']
-            #debug['original_mask_miss'] = mask
 
             image, mask, meta, labels = self.transform_data(image, mask, meta)
             image = np.transpose(image, (2, 0, 1))
 
-            num +=1
-
-            if num==1:
-                continue
             yield image, mask, labels, debug
 
     def num_keys(self):
@@ -76,7 +69,7 @@ class DataIterator:
 
     def transform_data(self, img, mask,  meta):
 
-        aug = AugmentSelection.random() if self.random else AugmentSelection.unrandom()
+        aug = AugmentSelection.random() if self.augment else AugmentSelection.unrandom()
         img, mask, meta = Transformer.transform(img, mask, meta, aug=aug)
         labels = self.heatmapper.create_heatmaps(meta['joints'], mask)
 

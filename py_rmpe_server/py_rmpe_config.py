@@ -41,7 +41,7 @@ class RmpeGlobalConfig:
 
     data_shape = (3, height, width)     # 3, 368, 368
     mask_shape = (height//stride, width//stride)  # 46, 46
-    parts_shape = (num_layers, height//stride, width//stride)  # 1, 46, 46
+    parts_shape = (num_layers, height//stride, width//stride)  # 57, 46, 46
 
 class TransformationParams:
 

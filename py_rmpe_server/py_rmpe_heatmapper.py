@@ -51,16 +51,21 @@ class Heatmapper:
             #    print("%d, joint: %f, EXP_X: %s" % (layer, joints[i,0], exp_x))
             #    print("%d, joint: %f, EXP_Y: %s" % (layer, joints[i,1], exp_y))
 
-            exp = np.outer(exp_y,exp_x)
+            exp = np.outer(exp_y, exp_x)
 
             #if layer==0:
             #    print("%d, EXP: %s" % (layer, exp))
 
-            heatmaps[RmpeGlobalConfig.heat_start + layer, :, :] += exp
+            # current way is sum of exps/trim at 1.0. May be best way is just max of exps
+            # heatmaps[RmpeGlobalConfig.heat_start + layer, :, :] += exp
 
-        # TODO: current way is sum of exps/trim at 1.0. May be best way is just max of exps
-        heatmaps[RmpeGlobalConfig.heat_start + layer, :, :] = np.minimum(heatmaps[RmpeGlobalConfig.heat_start + layer, :, :], 1.0)
+            # TODO: this is kinda strange but I've read original article after code and found they really use maximum. But in C++ code sum+trim.
+            # entry[g_y * grid_x + g_x] += exp(-exponent);
+            # if (entry[g_y * grid_x + g_x] > 1)
+            #    entry[g_y * grid_x + g_x] = 1;
 
+            # I will do maximum like in article
+            heatmaps[RmpeGlobalConfig.heat_start + layer, :, :] = np.maximum(heatmaps[RmpeGlobalConfig.heat_start + layer, :, :], exp)
 
     def put_joints(self, heatmaps, joints):
 

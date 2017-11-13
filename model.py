@@ -7,6 +7,10 @@ from keras.layers.merge import Multiply
 from keras.regularizers import l2
 from keras.initializers import random_normal,constant
 
+stages = 6
+np_branch1 = 38
+np_branch2 = 19
+
 def relu(x): return Activation('relu')(x)
 
 def conv(x, nf, ks, name, weight_decay):
@@ -101,19 +105,16 @@ def stageT_block(x, num_p, stage, branch, weight_decay):
 
 def apply_mask(x, mask1, mask2, num_p, stage, branch):
     w_name = "weight_stage%d_L%d" % (stage, branch)
-    if num_p == 38:
-        w = Multiply(name=w_name)([x, mask1]) # vec_weight
-
-    else:
+    if num_p == np_branch1:
+        w = Multiply(name=w_name)([x, mask1])  # vec_weight
+    elif num_p == np_branch2:
         w = Multiply(name=w_name)([x, mask2])  # vec_heat
+    else:
+        assert False, "wrong number of layers num_p=%d " % num_p
     return w
 
 
 def get_training_model(weight_decay):
-
-    stages = 6
-    np_branch1 = 38
-    np_branch2 = 19
 
     img_input_shape = (None, None, 3)
     vec_input_shape = (None, None, 38)
@@ -170,9 +171,6 @@ def get_training_model(weight_decay):
 
 
 def get_testing_model():
-    stages = 6
-    np_branch1 = 38
-    np_branch2 = 19
 
     img_input_shape = (None, None, 3)
 
