@@ -2,14 +2,15 @@
 
 This fork contains **py_rmpe_server** - pure python version of **rmpe_dataset_server**.
 
-It have less code(19kb vs 25kb), and significantly faster (140 images/s vs 30 images/s C++ code on my machine)
+It have less code(19kb vs 35kb), and significantly faster (140 images/s vs 30 images/s C++ code on my machine)
 
 #### Current status
 - [x] image augmentation: rotate, shift, scale, crop, flip (implemented as single affine transform, i.e. much faster)
 - [x] mask calculation: rotate, shift, scale, crop, flip
 - [x] joint heatmaps
 - [x] limbs part affinity fields
-- [ ] needs testing
+- [x] tested using rmpe_server_tester.py, found some differences from C++ version, but looks like it is C++ code is buggy 
+- [ ] need to train model on it 
 
 
 #### How to help
