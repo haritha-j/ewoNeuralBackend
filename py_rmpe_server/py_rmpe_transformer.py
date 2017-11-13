@@ -5,24 +5,7 @@ from math import cos, sin, pi
 import cv2
 import random
 
-from py_rmpe_config import RmpeGlobalConfig
-
-class TransformationParams:
-
-    stride = 8
-    crop_size_x = RmpeGlobalConfig.width # = 368
-    crop_size_y = RmpeGlobalConfig.height # = 368
-    target_dist = 0.6;
-    scale_prob = 1;   # TODO: this is actually scale unprobability, i.e. 1 = off, 0 = always, not sure if it is a bug or not
-    scale_min = 0.5;
-    scale_max = 1.1;
-    max_rotate_degree = 40.
-    center_perterb_max = 40.
-    #do_clahe = False; - not yet used
-    #mirror = True; - not yet used
-    flip_prob = 0.5
-    sigma = 7.
-
+from py_rmpe_config import RmpeGlobalConfig, TransformationParams
 
 class AugmentSelection:
 
@@ -40,6 +23,16 @@ class AugmentSelection:
             if random.uniform(0.,1.) > TransformationParams.scale_prob else 1. # TODO: see 'scale improbability' TODO above
         x_offset = int(random.uniform(-1.,1.) * TransformationParams.center_perterb_max);
         y_offset = int(random.uniform(-1.,1.) * TransformationParams.center_perterb_max);
+
+        return AugmentSelection(flip, degree, (x_offset,y_offset), scale)
+
+    @staticmethod
+    def unrandom():
+        flip = False
+        degree = 0.
+        scale = 1.
+        x_offset = 0
+        y_offset = 0
 
         return AugmentSelection(flip, degree, (x_offset,y_offset), scale)
 
@@ -75,13 +68,12 @@ class AugmentSelection:
                           [ 0., 1., 0. ],
                           [ 0., 0., 1. ]] )
 
-        center2center = np.array( [[ 1., 0., TransformationParams.crop_size_x//2],
-                                   [ 0., 1., TransformationParams.crop_size_y//2 ],
+        center2center = np.array( [[ 1., 0., RmpeGlobalConfig.width//2],
+                                   [ 0., 1., RmpeGlobalConfig.height//2 ],
                                    [ 0., 0., 1. ]] )
 
         # order of combination is reversed
         combined = center2center.dot(flip).dot(scale).dot(rotate).dot(center2zero)
-        print(combined)
 
         return combined[0:2]
 
@@ -95,14 +87,16 @@ class Transformer:
 
         # TODO: need to understand this, scale_provided[0] is height of main person divided by 368, caclulated in generate_hdf5.py
         # print(img.shape)
-        img = cv2.warpAffine(img, M, (TransformationParams.crop_size_y, TransformationParams.crop_size_x), borderMode=cv2.BORDER_CONSTANT, borderValue=(127,127,127))
-        mask = cv2.warpAffine(mask, M, (TransformationParams.crop_size_y, TransformationParams.crop_size_x), borderMode=cv2.BORDER_CONSTANT, borderValue=255)
+        img = cv2.warpAffine(img, M, (RmpeGlobalConfig.height, RmpeGlobalConfig.width), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=(127,127,127))
+        mask = cv2.warpAffine(mask, M, (RmpeGlobalConfig.height, RmpeGlobalConfig.width), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=255)
+        mask = cv2.resize(mask, RmpeGlobalConfig.mask_shape, interpolation=cv2.INTER_CUBIC)  # TODO: should be combined with warp for speed
         #_, mask = cv2.threshold(mask, 128, 255, cv2.THRESH_BINARY)
-        #assert np.all((mask == 0) | (mask == 255)), "Interpolation of mask should be thresholded only 0 or 255"
-
+        #assert np.all((mask == 0) | (mask == 255)), "Interpolation of mask should be thresholded only 0 or 255\n" + str(mask)
+        mask = mask.astype(np.float) / 255.
 
         # warp key points
         #TODO: joint could be cropped by augmentation, in this case we should mark it as invisible.
+        #update: may be we don't need it actually, original code removed part sliced more than half totally, may be we should keep it
         original_points = meta['joints'].copy()
         original_points[:,:,2]=1  # we reuse 3rd column in completely different way here, it is hack
         converted_points = np.matmul(M, original_points.transpose([0,2,1])).transpose([0,2,1])

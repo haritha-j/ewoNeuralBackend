@@ -191,9 +191,13 @@ def writeHDF5():
     for count in range(numSample):
         idx = random_order[count]
 
-        img = cv2.imread(data[idx]['img_paths'])
-        mask_all = cv2.imread(data[idx]['mask_all_paths'], 0)
-        mask_miss = cv2.imread(data[idx]['mask_miss_paths'], 0)
+        img_path = data[idx]['img_paths']
+        mask_all_path = data[idx]['mask_all_paths']
+        mask_miss_path = data[idx]['mask_miss_paths']
+
+        img = cv2.imread(img_path)
+        mask_all = cv2.imread(mask_all_path, 0)
+        mask_miss = cv2.imread(mask_miss_path, 0)
 
         isValidation = data[idx]['isValidation']
 
@@ -311,6 +315,10 @@ def writeHDF5():
                         meta_data[clidx][j] = row_binary[j]
                     clidx = clidx + 1
                 serializable_meta['joints'].append(joint_other[n].tolist())
+
+        serializable_meta['img_path'] = img_path
+        serializable_meta['mask_all_path'] = mask_all_path
+        serializable_meta['mask_miss_path'] = mask_miss_path
 
         assert len(serializable_meta['joints']) == 1+nop, [ len(serializable_meta['joints']), 1+nop ]
         assert len(serializable_meta['scale_provided']) == 1+nop, [ len(serializable_meta['scale_provided']), 1+nop ]
