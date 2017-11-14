@@ -26,6 +26,7 @@ max_iter = 200000 # 600000
 use_client_gen = True
 
 WEIGHTS_BEST = "weights.best.h5"
+WEIGHTS_SAVE = 'weights.{epoch:04d}.hdf5'
 TRAINING_LOG = "training.csv"
 LOGS_DIR = "./logs"
 
@@ -151,7 +152,7 @@ def step_decay(epoch):
 
 # configure callbacks
 lrate = LearningRateScheduler(step_decay)
-checkpoint = ModelCheckpoint(WEIGHTS_BEST, monitor='loss', verbose=0, save_best_only=False, save_weights_only=True, mode='min', period=1)
+checkpoint = ModelCheckpoint(WEIGHTS_SAVE, monitor='loss', verbose=0, save_best_only=False, save_weights_only=True, mode='min', period=1)
 csv_logger = CSVLogger(TRAINING_LOG, append=True)
 tb = TensorBoard(log_dir=LOGS_DIR, histogram_freq=0, write_graph=True, write_images=False)
 
@@ -161,10 +162,10 @@ callbacks_list = [lrate, checkpoint, csv_logger, tb]
 multisgd = MultiSGD(lr=base_lr, momentum=momentum, decay=0.0, nesterov=False, lr_mult=lr_mult)
 
 # start training
-model.compile(loss=losses, optimizer=multisgd, metrics=["accuracy"])
+model.compile(loss=losses, optimizer=multisgd)
 
 model.fit_generator(train_di,
-                    steps_per_epoch=train_samples // batch_size,
+                    steps_per_epoch=train_samples // batch_size // 10,
                     epochs=max_iter,
                     callbacks=callbacks_list,
                     #validation_data=val_di,

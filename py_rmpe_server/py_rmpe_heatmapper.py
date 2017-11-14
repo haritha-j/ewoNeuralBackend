@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
-from math import sqrt
+from math import sqrt, isnan
 
 from py_rmpe_config import RmpeGlobalConfig, TransformationParams
 
@@ -85,8 +85,16 @@ class Heatmapper:
             dx = x2-x1
             dy = y2-y1
             dnorm = sqrt(dx*dx + dy*dy)
-            dx = dx/dnorm
+
+            if dnorm==0:  # we get nan here sometimes, it's kills NN
+                # TODO: handle it better. probably we should add zero paf, centered paf, or skip this completely
+                print("Parts are too close to each other. Length is zero. Skipping")
+                continue
+
+            dx = dx / dnorm
             dy = dy / dnorm
+
+            assert not isnan(dx) and not isnan(dy), "dnorm is zero, wtf"
 
             min_sx, max_sx = (x1, x2) if x1 < x2 else (x2, x1)
             min_sy, max_sy = (y1, y2) if y1 < y2 else (y2, y1)
