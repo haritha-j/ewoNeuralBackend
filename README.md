@@ -10,7 +10,6 @@ It have less code(19kb vs 35kb), and significantly faster (140 images/s vs 30 im
 - [x] joint heatmaps
 - [x] limbs part affinity fields
 - [x] tested using rmpe_server_tester.py, found some differences from C++ version, but looks like it is C++ code is buggy 
-- [ ] during traning loss is becoming NaN, could use some help finding a bug 
 
 
 #### How to help
@@ -19,7 +18,6 @@ It have less code(19kb vs 35kb), and significantly faster (140 images/s vs 30 im
 - test result with **inspect_dataset.ipynb** 
 - look to the code and give feedback
 - try to train
-
 
 
 # Realtime Multi-Person Pose Estimation

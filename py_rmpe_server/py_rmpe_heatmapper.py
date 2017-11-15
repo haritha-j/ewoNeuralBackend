@@ -3,7 +3,7 @@
 import numpy as np
 from math import sqrt, isnan
 
-from py_rmpe_config import RmpeGlobalConfig, TransformationParams
+from py_rmpe_server.py_rmpe_config import RmpeGlobalConfig, TransformationParams
 
 class Heatmapper:
 
@@ -12,7 +12,7 @@ class Heatmapper:
         self.double_sigma2 = 2 * sigma * sigma
         self.thre = thre
 
-        # casched common parameters which same for all iterations and all pictures
+        # cached common parameters which same for all iterations and all pictures
 
         stride = RmpeGlobalConfig.stride
         width = RmpeGlobalConfig.width//stride
@@ -47,24 +47,10 @@ class Heatmapper:
             exp_x = np.exp(-(self.grid_x-joints[i,0])**2/self.double_sigma2)
             exp_y = np.exp(-(self.grid_y-joints[i,1])**2/self.double_sigma2)
 
-            #if layer==0:
-            #    print("%d, joint: %f, EXP_X: %s" % (layer, joints[i,0], exp_x))
-            #    print("%d, joint: %f, EXP_Y: %s" % (layer, joints[i,1], exp_y))
-
             exp = np.outer(exp_y, exp_x)
 
-            #if layer==0:
-            #    print("%d, EXP: %s" % (layer, exp))
-
-            # current way is sum of exps/trim at 1.0. May be best way is just max of exps
-            # heatmaps[RmpeGlobalConfig.heat_start + layer, :, :] += exp
-
-            # TODO: this is kinda strange but I've read original article after code and found they really use maximum. But in C++ code sum+trim.
-            # entry[g_y * grid_x + g_x] += exp(-exponent);
-            # if (entry[g_y * grid_x + g_x] > 1)
-            #    entry[g_y * grid_x + g_x] = 1;
-
-            # I will do maximum like in article
+            # note this is correct way of combination - min(sum(...),1.0) as was in C++ code is incorrect
+            # https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation/issues/118
             heatmaps[RmpeGlobalConfig.heat_start + layer, :, :] = np.maximum(heatmaps[RmpeGlobalConfig.heat_start + layer, :, :], exp)
 
     def put_joints(self, heatmaps, joints):
@@ -98,6 +84,12 @@ class Heatmapper:
 
             min_sx, max_sx = (x1, x2) if x1 < x2 else (x2, x1)
             min_sy, max_sy = (y1, y2) if y1 < y2 else (y2, y1)
+
+            # TODO: check PAF off screen.
+            # looks like slices working properly
+            # > foo=np.array([1,2,3,4,5,6,7,8,9,10])
+            # > foo[slice(-10,5)]
+            # array([1, 2, 3, 4, 5])
 
             min_sx = int((min_sx - self.thre) / RmpeGlobalConfig.stride)
             min_sy = int((min_sy - self.thre) / RmpeGlobalConfig.stride)

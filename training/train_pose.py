@@ -4,16 +4,19 @@ import pandas
 import re
 import math
 sys.path.append("..")
+
+from coco_eval import CocoEval
 from model import get_training_model
-from ds_iterator import DataIterator
-from ds_generator_client import DataGeneratorClient
+from ds_generators import DataGeneratorClient, DataIterator
 from optimizers import MultiSGD
-from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger, TensorBoard
+from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger, TensorBoard, TerminateOnNaN
 from keras.layers.convolutional import Conv2D
 from keras.applications.vgg19 import VGG19
 import keras.backend as K
 
-batch_size = 50
+from glob import glob
+
+batch_size = 20
 base_lr = 4e-5 # 2e-5
 momentum = 0.9
 weight_decay = 5e-4
@@ -21,21 +24,29 @@ lr_policy =  "step"
 gamma = 0.333
 stepsize = 136106 #68053   // after each stepsize iterations update learning rate: lr=lr*gamma
 max_iter = 200000 # 600000
+use_multiple_gpus = None #2 # set None for 1 gpu, not 1
 
-# True = start data generator client, False = use augmented dataset file (deprecated)
-use_client_gen = True
 
-WEIGHTS_BEST = "weights.best.h5"
-WEIGHTS_SAVE = 'weights.{epoch:04d}.hdf5'
+WEIGHTS_SAVE = 'weights.{epoch:04d}.h5'
 TRAINING_LOG = "training.csv"
 LOGS_DIR = "./logs"
+WEIGHT_DIR = "./weights"
 
-def get_last_epoch():
-    data = pandas.read_csv(TRAINING_LOG)
-    return max(data['epoch'].values)
+def get_last_epoch_and_weights_file():
+    os.makedirs(WEIGHT_DIR, exist_ok=True)
+    files = [file for file in glob(WEIGHT_DIR + '/weights.*.h5')]
+    files = [file.split('/')[-1] for file in files]
+    epochs = [file.split('.')[1] for file in files if file]
+    epochs = [int(epoch) for epoch in epochs if epoch.isdigit() ]
+    if len(epochs) == 0:
+        if 'weights.best.h5' in files:
+            return -1, WEIGHT_DIR + '/weights.best.h5'
+    else:
+        ep = max([int(epoch) for epoch in epochs])
+        return ep, WEIGHT_DIR + '/' + WEIGHTS_SAVE.format(epoch=ep)
+    return None, None
 
-
-model = get_training_model(weight_decay)
+model = get_training_model(weight_decay, gpus=use_multiple_gpus)
 
 from_vgg = dict()
 from_vgg['conv1_1'] = 'block1_conv1'
@@ -50,11 +61,13 @@ from_vgg['conv4_1'] = 'block4_conv1'
 from_vgg['conv4_2'] = 'block4_conv2'
 
 # load previous weights or vgg19 if this is the first run
-if os.path.exists(WEIGHTS_BEST):
-    print("Loading the best weights...")
+last_epoch, wfile = get_last_epoch_and_weights_file()
+if wfile is not None:
+    print("Loading %s ..." % wfile)
 
-    model.load_weights(WEIGHTS_BEST)
-    last_epoch = get_last_epoch() + 1
+    model.load_weights(wfile)
+    last_epoch = last_epoch + 1
+
 else:
     print("Loading vgg19 weights...")
 
@@ -67,30 +80,6 @@ else:
             print("Loaded VGG19 layer: " + vgg_layer_name)
 
     last_epoch = 0
-
-# prepare generators
-
-if use_client_gen:
-    train_client = DataGeneratorClient(port=5555, host="localhost", hwm=160, batch_size=10)
-    train_client.start()
-    train_di = train_client.gen()
-    train_samples = 52597
-
-    val_client = DataGeneratorClient(port=5556, host="localhost", hwm=160, batch_size=10)
-    val_client.start()
-    val_di = val_client.gen()
-    val_samples = 2645
-else:
-    train_di = DataIterator("../dataset/train_dataset.h5", data_shape=(3, 368, 368),
-                      mask_shape=(1, 46, 46),
-                      label_shape=(57, 46, 46),
-                      vec_num=38, heat_num=19, batch_size=batch_size, shuffle=True)
-    train_samples=train_di.N
-    val_di = DataIterator("../dataset/val_dataset.h5", data_shape=(3, 368, 368),
-                      mask_shape=(1, 46, 46),
-                      label_shape=(57, 46, 46),
-                      vec_num=38, heat_num=19, batch_size=batch_size, shuffle=True)
-    val_samples=val_di.N
 
 # setup lr multipliers for conv layers
 lr_mult=dict()
@@ -126,50 +115,74 @@ def eucl_loss(x, y):
     l = K.sum(K.square(x - y)) / batch_size / 2
     return l
 
-losses = {}
-losses["weight_stage1_L1"] = eucl_loss
-losses["weight_stage1_L2"] = eucl_loss
-losses["weight_stage2_L1"] = eucl_loss
-losses["weight_stage2_L2"] = eucl_loss
-losses["weight_stage3_L1"] = eucl_loss
-losses["weight_stage3_L2"] = eucl_loss
-losses["weight_stage4_L1"] = eucl_loss
-losses["weight_stage4_L2"] = eucl_loss
-losses["weight_stage5_L1"] = eucl_loss
-losses["weight_stage5_L2"] = eucl_loss
-losses["weight_stage6_L1"] = eucl_loss
-losses["weight_stage6_L2"] = eucl_loss
+#losses = {}
+#losses["weight_stage1_L1"] = eucl_loss
+#losses["weight_stage1_L2"] = eucl_loss
+#losses["weight_stage2_L1"] = eucl_loss
+#losses["weight_stage2_L2"] = eucl_loss
+#losses["weight_stage3_L1"] = eucl_loss
+#losses["weight_stage3_L2"] = eucl_loss
+#losses["weight_stage4_L1"] = eucl_loss
+#losses["weight_stage4_L2"] = eucl_loss
+#losses["weight_stage5_L1"] = eucl_loss
+#losses["weight_stage5_L2"] = eucl_loss
+#losses["weight_stage6_L1"] = eucl_loss
+#losses["weight_stage6_L2"] = eucl_loss
+
+# prepare generators
+
+# True = start zmq client, False local client
+use_client_gen = False
+
+if use_client_gen:
+    train_client = DataGeneratorClient(port=5555, host="localhost", hwm=160, batch_size=batch_size)
+    val_client = DataGeneratorClient(port=5556, host="localhost", hwm=160, batch_size=batch_size)
+else:
+    train_client = DataIterator("../dataset/train_dataset.h5", shuffle=True, augment=True, batch_size=batch_size)
+    val_client = DataIterator("../dataset/train_dataset.h5", shuffle=True, augment=True, batch_size=batch_size)
+
+
+train_di = train_client.gen()
+train_samples = 52597
+val_di = val_client.gen()
+val_samples = 2645
 
 # learning rate schedule - equivalent of caffe lr_policy =  "step"
 iterations_per_epoch = train_samples // batch_size
 def step_decay(epoch):
-    initial_lrate = base_lr
     steps = epoch * iterations_per_epoch
-
-    lrate = initial_lrate * math.pow(gamma, math.floor(steps/stepsize))
-
+    lrate = base_lr * math.pow(gamma, math.floor(steps/stepsize))
     return lrate
+
 
 # configure callbacks
 lrate = LearningRateScheduler(step_decay)
-checkpoint = ModelCheckpoint(WEIGHTS_SAVE, monitor='loss', verbose=0, save_best_only=False, save_weights_only=True, mode='min', period=1)
+checkpoint = ModelCheckpoint(WEIGHT_DIR + '/' + WEIGHTS_SAVE, monitor='loss', verbose=0, save_best_only=False, save_weights_only=True, mode='min', period=1)
 csv_logger = CSVLogger(TRAINING_LOG, append=True)
 tb = TensorBoard(log_dir=LOGS_DIR, histogram_freq=0, write_graph=True, write_images=False)
+tnan = TerminateOnNaN()
+coco_eval = CocoEval(train_client, val_client)
 
-callbacks_list = [lrate, checkpoint, csv_logger, tb]
+callbacks_list = [lrate, checkpoint, csv_logger, tb, tnan, coco_eval]
 
 # sgd optimizer with lr multipliers
 multisgd = MultiSGD(lr=base_lr, momentum=momentum, decay=0.0, nesterov=False, lr_mult=lr_mult)
 
 # start training
-model.compile(loss=losses, optimizer=multisgd)
+
+if use_multiple_gpus is not None:
+    from keras.utils import multi_gpu_model
+    model = multi_gpu_model(model, gpus=use_multiple_gpus)
+
+model.compile(loss=eucl_loss, optimizer=multisgd)
+
 
 model.fit_generator(train_di,
                     steps_per_epoch=train_samples // batch_size // 10,
                     epochs=max_iter,
                     callbacks=callbacks_list,
-                    #validation_data=val_di,
-                    #validation_steps=val_samples // batch_size,
+                    validation_data=val_di,
+                    validation_steps=val_samples // batch_size,
                     use_multiprocessing=False,
                     initial_epoch=last_epoch
                     )

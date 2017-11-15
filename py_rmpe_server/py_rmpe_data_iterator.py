@@ -1,13 +1,14 @@
 
 import h5py
-from py_rmpe_config import RmpeGlobalConfig, RmpeCocoConfig
 import random
-from py_rmpe_transformer import Transformer, AugmentSelection
-from py_rmpe_heatmapper import Heatmapper
 import json
 import numpy as np
 
-class DataIterator:
+from py_rmpe_server.py_rmpe_config import RmpeGlobalConfig, RmpeCocoConfig
+from py_rmpe_server.py_rmpe_transformer import Transformer, AugmentSelection
+from py_rmpe_server.py_rmpe_heatmapper import Heatmapper
+
+class RawDataIterator:
 
     def __init__(self, h5file, shuffle = True, augment = True):
 
@@ -18,7 +19,7 @@ class DataIterator:
         self.augment = augment
         self.shuffle = shuffle
 
-    def iterate(self):
+    def gen(self, dbg=False):
 
         keys = list(self.datum.keys())
 
@@ -30,9 +31,6 @@ class DataIterator:
             image, mask, meta = self.read_data(key)
             debug = {}
 
-            print("[in] IMAGE:", image.shape, image.dtype, meta['img_path'])
-            print("[in] MASK:", mask.shape, mask.dtype, meta['mask_miss_path'])
-
             debug['img_path']=meta['img_path']
             debug['mask_miss_path'] = meta['mask_miss_path']
             debug['mask_all_path'] = meta['mask_all_path']
@@ -40,7 +38,7 @@ class DataIterator:
             image, mask, meta, labels = self.transform_data(image, mask, meta)
             image = np.transpose(image, (2, 0, 1))
 
-            yield image, mask, labels, debug
+            yield image, mask, labels, meta['joints']
 
     def num_keys(self):
         return len(list(self.datum.keys()))

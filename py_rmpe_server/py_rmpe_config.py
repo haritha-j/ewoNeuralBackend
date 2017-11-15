@@ -23,7 +23,6 @@ class RmpeGlobalConfig:
     num_parts_with_background = len(parts)
 
     leftParts, rightParts = ltr_parts(parts_dict)
-    print(leftParts, rightParts)
 
     # this numbers probably copied from matlab they are 1.. based not 0.. based
     limb_from = [2, 9,  10, 2,  12, 13, 2, 3, 4, 3,  2, 6, 7, 6,  2, 1,  1,  15, 16]

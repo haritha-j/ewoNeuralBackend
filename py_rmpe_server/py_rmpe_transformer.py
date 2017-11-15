@@ -5,7 +5,7 @@ from math import cos, sin, pi
 import cv2
 import random
 
-from py_rmpe_config import RmpeGlobalConfig, TransformationParams
+from py_rmpe_server.py_rmpe_config import RmpeGlobalConfig, TransformationParams
 
 class AugmentSelection:
 

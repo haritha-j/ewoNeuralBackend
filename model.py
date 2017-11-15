@@ -5,7 +5,7 @@ from keras.layers.convolutional import Conv2D
 from keras.layers.pooling import MaxPooling2D
 from keras.layers.merge import Multiply
 from keras.regularizers import l2
-from keras.initializers import random_normal,constant
+from keras.initializers import random_normal, constant
 
 stages = 6
 np_branch1 = 38
@@ -114,7 +114,7 @@ def apply_mask(x, mask1, mask2, num_p, stage, branch):
     return w
 
 
-def get_training_model(weight_decay):
+def get_training_model(weight_decay, gpus=None):
 
     img_input_shape = (None, None, 3)
     vec_input_shape = (None, None, 38)
@@ -165,7 +165,12 @@ def get_training_model(weight_decay):
         if (sn < stages):
             x = Concatenate()([stageT_branch1_out, stageT_branch2_out, stage0_out])
 
-    model = Model(inputs=inputs, outputs=outputs)
+    if gpus is None:
+        model = Model(inputs=inputs, outputs=outputs)
+    else:
+        import tensorflow as tf
+        with tf.device('/cpu:0'): #this model will not be actually used, it's template
+            model = Model(inputs=inputs, outputs=outputs)
 
     return model
 

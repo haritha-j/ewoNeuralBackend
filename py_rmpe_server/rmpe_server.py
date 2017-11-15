@@ -2,27 +2,31 @@
 import sys
 import numpy as np
 import zmq
-
 from multiprocessing import Process
-from py_rmpe_data_iterator import DataIterator
-
 from time import time
+
+sys.path.append("..")
+
+from py_rmpe_data_iterator import RawDataIterator
+
 
 class Server:
 
     # these methods all called in parent process
 
-    def __init__(self, h5file, port, name):
+    def __init__(self, h5file, port, name, shuffle, augment):
 
         self.name = name
         self.port = port
         self.h5file = h5file
 
+        self.shuffle = shuffle
+        self.augment = augment
+
         self.process = Process(target=Server.loop, args=(self,))
         self.process.daemon = True
         self.process.start()
 
-        self.heatmapper = None
 
 
     def join(self):
@@ -44,7 +48,7 @@ class Server:
         print("%s: Child process init... " % self.name)
         self.init()
 
-        iterator = DataIterator(self.h5file, shuffle=False, augment=True)
+        iterator = RawDataIterator(self.h5file, shuffle=self.shuffle, augment=self.augment)
 
         print("%s: Loop started... " % self.name)
 
@@ -54,45 +58,39 @@ class Server:
 
         while True:
 
-
             keys = iterator.num_keys()
             print("%s: generation %s, %d images " % (self.name, generation, keys))
 
             start = time()
-            for (image, mask, labels, debug) in iterator.iterate():
+            for (image, mask, labels, keypoints) in iterator.gen():
 
-                headers = self.produce_headers(image, mask, labels)
-                print("[out] HEADERS:",headers)
+                augment_time = time()-start
+
+                headers = self.produce_headers(image, mask, labels, keypoints)
                 self.socket.send_json(headers)
-                print("[out] IMAGE:", image.shape, image.dtype, np.max(image))
                 self.socket.send(np.ascontiguousarray(image))
-                print("[out] MASK:", mask.shape, mask.dtype, np.max(image))
                 self.socket.send(np.ascontiguousarray(mask))
-                print("[out] LABELS:", labels.shape, labels.dtype, np.max(labels) )
                 self.socket.send(np.ascontiguousarray(labels))
+                self.socket.send(np.ascontiguousarray(keypoints))
 
                 num += 1
-                print("[%d/%d] %0.2f images per second (last image %0.2f ms)" % (num, keys, num/(time() - cycle_start), (time() - start)*1000 ) )
+                print("%s [%d/%d] aug %0.2f ms (%0.2f im/s), send %0.2f ms" % (self.name, num, keys, augment_time*1000, 1./augment_time,  time() - start - augment_time) )
                 start = time()
 
-                print()
-                print()
-
-
-    def produce_headers(self, img, mask, labels):
+    def produce_headers(self, img, mask, labels, keypoints):
 
         header_data = {"descr": img.dtype.str, "shape": img.shape, "fortran_order": False}
         header_mask = {"descr": mask.dtype.str, "shape": mask.shape,   "fortran_order": False}
         header_label = {"descr": labels.dtype.str,  "shape": labels.shape, "fortran_order": False}
-        headers = [header_data, header_mask, header_label]
+        header_keypoints = {"descr": keypoints.dtype.str,  "shape": keypoints.shape, "fortran_order": False}
 
         return headers
 
 
 def main():
 
-    train = Server("../dataset/train_dataset.h5", 5555, "Train")
-    val = Server("../dataset/val_dataset.h5", 5556, "Val")
+    train = Server("../dataset/train_dataset.h5", 5555, "Train", shuffle=False, augment=True)
+    val = Server("../dataset/val_dataset.h5", 5556, "Val", shuffle=False, augment=False)
 
     processes = [val, train] #,
 
