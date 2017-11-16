@@ -84,6 +84,8 @@ class Server:
         header_label = {"descr": labels.dtype.str,  "shape": labels.shape, "fortran_order": False}
         header_keypoints = {"descr": keypoints.dtype.str,  "shape": keypoints.shape, "fortran_order": False}
 
+        headers = [header_data, header_mask, header_label, header_keypoints]
+
         return headers
 
 

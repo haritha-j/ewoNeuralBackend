@@ -14,8 +14,9 @@ It have less code(19kb vs 35kb), and significantly faster (140 images/s vs 30 im
 
 #### How to help
 - re-generate val_dataset.h5 with new version of generate_hdf5.py (will be backward compatible, just one attribute 'meta' added)
-- run ./py_rmpe_server.py (file names/ports are hardcoded, patch them if you need). server could run both val and training augmentation using fork.  
-- test result with **inspect_dataset.ipynb** 
+- since augmentation is very fast now, by default it works inside train_pose.py (separate thread)  
+- if you want to run external augmentation server run ./rmpe_server.py and change use_client_gen = True in train_pose.py    
+- test result with **inspect_dataset.ipynb** or **rmpe_server_tester.py raw save** (saves all images, heatmaps and PAFs to disk)  
 - look to the code and give feedback
 - try to train
 
