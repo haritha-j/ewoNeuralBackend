@@ -1,8 +1,8 @@
 ### About this fork
 
-This fork contains **py_rmpe_server** - pure python version of **rmpe_dataset_server**.
-
+This fork contains pure python version of **rmpe_dataset_server**. 
 It have less code(19kb vs 35kb), and significantly faster (140 images/s vs 30 images/s C++ code on my machine)
+Could be run as iterator inside **train_pose.py** (default), or as **./rmpe_server.py** 
 
 #### Current status
 - [x] image augmentation: rotate, shift, scale, crop, flip (implemented as single affine transform, i.e. much faster)
