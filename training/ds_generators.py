@@ -174,5 +174,5 @@ class DataIterator(DataIteratorBase):
 
             print("Staring next generator loop cycle")
 
-            self.generator = raw_data_iterator.gen()
+            self.generator = self.raw_data_iterator.gen()
 

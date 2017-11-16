@@ -178,7 +178,7 @@ model.compile(loss=eucl_loss, optimizer=multisgd)
 
 
 model.fit_generator(train_di,
-                    steps_per_epoch=train_samples // batch_size // 10,
+                    steps_per_epoch=iterations_per_epoch,
                     epochs=max_iter,
                     callbacks=callbacks_list,
                     validation_data=val_di,
