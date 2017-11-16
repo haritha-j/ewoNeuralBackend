@@ -26,8 +26,7 @@ class DataIteratorBase:
     def gen_raw(self): # this function used for test purposes in py_rmpe_server
 
         while True:
-            data_img, mask_img, label, keypoints = tuple(self._recv_arrays())
-            yield data_img, mask_img, label, keypoints
+            yield tuple(self._recv_arrays())
 
     def gen(self):
         batches_x, batches_x1, batches_x2, batches_y1, batches_y2 = \

@@ -5,7 +5,7 @@ import os
 sys.path.append("..")
 
 from time import time
-from training.ds_generator_client import DataGeneratorClient
+from training.ds_generators import DataGeneratorClient
 
 import cv2
 import numpy as np
@@ -101,7 +101,15 @@ def time_raw(client, save):
     num = 0
     start = time()
 
-    for x,y,z in client.gen_raw():
+    for foo in client.gen_raw():
+
+        if len(foo) == 3:
+            x, y, z = foo
+        elif len(foo) == 4:
+            x, y, z, k = foo
+        else:
+            raise NotImplementedError("Unknown number of tensors in proto %d" % len(foo))
+
         num += 1
         elapsed = time() - start
         print(num, num/elapsed, x.shape, y.shape, z.shape )
@@ -113,7 +121,6 @@ def time_raw(client, save):
 def main(type, batch_size, save):
 
     client = DataGeneratorClient(port=5556, host="localhost", hwm=1, batch_size=batch_size)
-    client.restart()
 
     if type=='processed':
         time_processed(client, batch_size)
