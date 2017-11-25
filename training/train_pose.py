@@ -139,7 +139,7 @@ if use_client_gen:
     val_client = DataGeneratorClient(port=5556, host="localhost", hwm=160, batch_size=batch_size)
 else:
     train_client = DataIterator("../dataset/train_dataset.h5", shuffle=True, augment=True, batch_size=batch_size)
-    val_client = DataIterator("../dataset/train_dataset.h5", shuffle=True, augment=True, batch_size=batch_size)
+    val_client = DataIterator("../dataset/val_dataset.h5", shuffle=False, augment=False, batch_size=batch_size)
 
 
 train_di = train_client.gen()
@@ -161,9 +161,9 @@ checkpoint = ModelCheckpoint(WEIGHT_DIR + '/' + WEIGHTS_SAVE, monitor='loss', ve
 csv_logger = CSVLogger(TRAINING_LOG, append=True)
 tb = TensorBoard(log_dir=LOGS_DIR, histogram_freq=0, write_graph=True, write_images=False)
 tnan = TerminateOnNaN()
-coco_eval = CocoEval(train_client, val_client)
+#coco_eval = CocoEval(train_client, val_client)
 
-callbacks_list = [lrate, checkpoint, csv_logger, tb, tnan, coco_eval]
+callbacks_list = [lrate, checkpoint, csv_logger, tb, tnan]
 
 # sgd optimizer with lr multipliers
 multisgd = MultiSGD(lr=base_lr, momentum=momentum, decay=0.0, nesterov=False, lr_mult=lr_mult)
@@ -187,3 +187,8 @@ model.fit_generator(train_di,
                     initial_epoch=last_epoch
                     )
 
+# loss = model.evaluate_generator(val_di,
+#                    steps=val_samples // batch_size,
+#                    use_multiprocessing=True,
+#                    )
+# print(loss)

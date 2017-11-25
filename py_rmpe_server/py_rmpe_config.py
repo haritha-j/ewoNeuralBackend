@@ -52,7 +52,7 @@ class TransformationParams:
     center_perterb_max = 40.
     flip_prob = 0.5
     sigma = 7.
-    paf_thre = 1.
+    paf_thre = 8.  # it is original 1.0 * stride in this program
 
 
 class RmpeCocoConfig:

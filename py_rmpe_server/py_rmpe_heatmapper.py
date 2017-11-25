@@ -23,8 +23,11 @@ class Heatmapper:
         self.grid_y = np.arange(height)*stride + stride/2-0.5
 
         self.Y, self.X = np.mgrid[0:RmpeGlobalConfig.height:stride,0:RmpeGlobalConfig.width:stride]
-        self.X = self.X + stride / 2 - 0.5
-        self.Y = self.Y + stride / 2 - 0.5
+
+        # TODO: check it again
+        # basically we should use center of grid, but in this place classic implementation uses left-top point.
+        # self.X = self.X + stride / 2 - 0.5
+        # self.Y = self.Y + stride / 2 - 0.5
 
     def create_heatmaps(self, joints, mask):
 
@@ -36,7 +39,10 @@ class Heatmapper:
 
         self.put_limbs(heatmaps, joints)
 
-        return heatmaps * mask
+        heatmaps *= mask
+
+        return heatmaps
+
 
     def put_gaussian_maps(self, heatmaps, layer, joints):
 
@@ -85,29 +91,39 @@ class Heatmapper:
             min_sx, max_sx = (x1, x2) if x1 < x2 else (x2, x1)
             min_sy, max_sy = (y1, y2) if y1 < y2 else (y2, y1)
 
-            # TODO: check PAF off screen.
-            # looks like slices working properly
-            # > foo=np.array([1,2,3,4,5,6,7,8,9,10])
-            # > foo[slice(-10,5)]
-            # array([1, 2, 3, 4, 5])
+            min_sx = int(round((min_sx - self.thre) / RmpeGlobalConfig.stride))
+            min_sy = int(round((min_sy - self.thre) / RmpeGlobalConfig.stride))
+            max_sx = int(round((max_sx + self.thre) / RmpeGlobalConfig.stride))
+            max_sy = int(round((max_sy + self.thre) / RmpeGlobalConfig.stride))
 
-            min_sx = int((min_sx - self.thre) / RmpeGlobalConfig.stride)
-            min_sy = int((min_sy - self.thre) / RmpeGlobalConfig.stride)
-            max_sx = int((max_sx + self.thre) / RmpeGlobalConfig.stride)
-            max_sy = int((max_sy + self.thre) / RmpeGlobalConfig.stride)
+            # check PAF off screen. do not really need to do it with max>grid size
+            if max_sy < 0:
+                continue
 
-            slice_x = slice(min_sx, max_sx + 1)
-            slice_y = slice(min_sy, max_sy + 1)
+            if max_sx < 0:
+                continue
+
+            if min_sx < 0:
+                min_sx = 0
+
+            if min_sy < 0:
+                min_sy = 0
+
+            #TODO: check it again
+            slice_x = slice(min_sx, max_sx) # + 1     this mask is not only speed up but crops paf really. This copied from original code
+            slice_y = slice(min_sy, max_sy) # + 1     int g_y = min_y; g_y < max_y; g_y++ -- note strict <
 
             dist = distances(self.X[slice_y,slice_x], self.Y[slice_y,slice_x], x1, y1, x2, y2)
-            dist = dist < RmpeGlobalConfig.stride
+            dist = dist <= self.thre
 
-            heatmaps[layerX, slice_y, slice_x] += dist * dx
-            heatmaps[layerY, slice_y, slice_x] += dist * dy
-            count[slice_y, slice_x] += 1
+            # TODO: averaging by pafs mentioned in the paper but never worked in C++ augmentation code
+            heatmaps[layerX, slice_y, slice_x][dist] = (dist * dx)[dist]  # += dist * dx
+            heatmaps[layerY, slice_y, slice_x][dist] = (dist * dy)[dist] # += dist * dy
+            count[slice_y, slice_x][dist] += 1
 
-        heatmaps[layerX, :, :][count > 0] /= count[count > 0]
-        heatmaps[layerY, :, :][count > 0] /= count[count > 0]
+        # TODO: averaging by pafs mentioned in the paper but never worked in C++ augmentation code
+        # heatmaps[layerX, :, :][count > 0] /= count[count > 0]
+        # heatmaps[layerY, :, :][count > 0] /= count[count > 0]
 
     def put_limbs(self, heatmaps, joints):
 

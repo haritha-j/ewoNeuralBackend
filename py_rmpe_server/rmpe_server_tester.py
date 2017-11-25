@@ -130,7 +130,7 @@ def main(type, batch_size, save):
         assert False, "type should be 'processed' or 'raw' "
 
 
-assert len(sys.argv) >=2,  "Usage: ./rmpe_dataset_server_stress_tester <processed|raw> [batch_size] [save]"
+assert len(sys.argv) >=2,  "Usage: ./rmpe_dataset_server_tester <processed|raw> [batch_size] [save]"
 batch_size=1
 save = False
 if 'save' in sys.argv:

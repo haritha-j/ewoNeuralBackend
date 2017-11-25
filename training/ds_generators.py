@@ -12,8 +12,9 @@ else:
 
 class DataIteratorBase:
 
-    def __init__(self, batch_size = 10):
+    def __init__(self, batch_size = 10, cycle = True):
 
+        self.cycle = cycle
         self.batch_size = batch_size
 
         self.split_point = 38
@@ -35,7 +36,13 @@ class DataIteratorBase:
 
         sample_idx = 0
 
-        for data_img, mask_img, label, kpts in self.gen_raw():
+        for foo in self.gen_raw():
+
+            if len(foo)==4:
+                data_img, mask_img, label, kpts = foo
+            else:
+                data_img, mask_img, label = foo
+                kpts = None
 
             # image
             dta_img = np.transpose(data_img, (1, 2, 0))
@@ -159,7 +166,7 @@ class DataIterator(DataIteratorBase):
 
         super(DataIterator, self).__init__(batch_size)
 
-        self.raw_data_iterator = RawDataIterator(file, shuffle=True, augment=True)
+        self.raw_data_iterator = RawDataIterator(file, shuffle=shuffle, augment=augment)
         self.generator = self.raw_data_iterator.gen()
 
 
@@ -171,7 +178,10 @@ class DataIterator(DataIteratorBase):
             if tpl is not None:
                 return tpl
 
-            print("Staring next generator loop cycle")
+            if self.cycle:
+                print("Staring next generator loop cycle")
+                self.generator = self.raw_data_iterator.gen()
+            else:
+                raise StopIteration
 
-            self.generator = self.raw_data_iterator.gen()
 

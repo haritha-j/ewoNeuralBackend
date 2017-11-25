@@ -94,7 +94,7 @@ def main():
     train = Server("../dataset/train_dataset.h5", 5555, "Train", shuffle=False, augment=True)
     val = Server("../dataset/val_dataset.h5", 5556, "Val", shuffle=False, augment=False)
 
-    processes = [val, train] #,
+    processes = [val, train]
 
     while None in [p.process.exitcode for p in processes]:
 
@@ -104,7 +104,7 @@ def main():
                 p.join()
 
 
-np.set_printoptions(precision=1, linewidth=75*3, suppress=True, threshold=100000)
+np.set_printoptions(precision=1, linewidth=100*3, suppress=True, threshold=100000)
 main()
 
 
