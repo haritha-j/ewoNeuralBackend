@@ -12,9 +12,8 @@ else:
 
 class DataIteratorBase:
 
-    def __init__(self, batch_size = 10, cycle = True):
+    def __init__(self, batch_size = 10):
 
-        self.cycle = cycle
         self.batch_size = batch_size
 
         self.split_point = 38
@@ -93,9 +92,12 @@ class DataIteratorBase:
 
 class DataGeneratorClient(DataIteratorBase):
 
-    def __init__(self, host, port, hwm=20, batch_size=10):
+    def __init__(self, host, port, hwm=20, batch_size=10, limit=None):
 
         super(DataGeneratorClient, self).__init__(batch_size)
+
+        self.limit = limit
+        self.records = 0
 
         """
         :param host:
@@ -140,6 +142,10 @@ class DataGeneratorClient(DataIteratorBase):
         If the first JSON object received contains the key `stop`,
         signifying that the server has finished a single epoch.
         """
+
+        if self.limit is not None and self.records > self.limit:
+            raise StopIteration
+
         headers = self.socket.recv_json()
         if 'stop' in headers:
             raise StopIteration
@@ -157,14 +163,18 @@ class DataGeneratorClient(DataIteratorBase):
                 array = array.transpose()
             arrays.append(array)
 
+        self.records += 1
         return arrays
 
 
 class DataIterator(DataIteratorBase):
 
-    def __init__(self, file, shuffle=True, augment=True, batch_size=10):
+    def __init__(self, file, shuffle=True, augment=True, batch_size=10, limit=None):
 
         super(DataIterator, self).__init__(batch_size)
+
+        self.limit = limit
+        self.records = 0
 
         self.raw_data_iterator = RawDataIterator(file, shuffle=shuffle, augment=augment)
         self.generator = self.raw_data_iterator.gen()
@@ -174,11 +184,15 @@ class DataIterator(DataIteratorBase):
 
         while True:
 
+            if self.limit is not None and self.records > self.limit:
+                raise StopIteration
+
             tpl = next(self.generator, None)
             if tpl is not None:
+                self.records += 1
                 return tpl
 
-            if self.cycle:
+            if self.limit is None or self.records < self.limit:
                 print("Staring next generator loop cycle")
                 self.generator = self.raw_data_iterator.gen()
             else:

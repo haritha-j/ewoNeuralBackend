@@ -17,12 +17,12 @@ import keras.backend as K
 from glob import glob
 
 batch_size = 20
-base_lr = 4e-5 # 2e-5
+base_lr = 2e-5
 momentum = 0.9
 weight_decay = 5e-4
 lr_policy =  "step"
 gamma = 0.333
-stepsize = 136106 #68053   // after each stepsize iterations update learning rate: lr=lr*gamma
+stepsize = 121000*17 # in original code each epoch is 120k and step change is on 17th epoch
 max_iter = 200000 # 600000
 use_multiple_gpus = None #2 # set None for 1 gpu, not 1
 
@@ -149,11 +149,15 @@ val_samples = 2645
 
 # learning rate schedule - equivalent of caffe lr_policy =  "step"
 iterations_per_epoch = train_samples // batch_size
+
 def step_decay(epoch):
-    steps = epoch * iterations_per_epoch
+    steps = epoch * iterations_per_epoch * batch_size
     lrate = base_lr * math.pow(gamma, math.floor(steps/stepsize))
+    print("Epoch:", epoch, "Learning rate:", lrate)
     return lrate
 
+print("Weight decay policy...")
+for i in range(1,100,5): step_decay(i)
 
 # configure callbacks
 lrate = LearningRateScheduler(step_decay)
