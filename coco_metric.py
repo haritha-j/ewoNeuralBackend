@@ -1,28 +1,22 @@
-import json
 import os
+import json
 
-import numpy as np
 import pandas as pd
-import cv2
-import tqdm
+import numpy as np
+from scipy.ndimage.filters import gaussian_filter
 
-import util
+import tqdm
+import cv2
+
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
-import skimage.io
+import util
 
 from config_reader import config_reader
 
 params, model_params = config_reader()
 params['scale_search'] = list(params['scale_search'])
 
-import json
-import numpy as np
-import cv2
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
-import util
-from scipy.ndimage.filters import gaussian_filter
 
 # the middle joints heatmap correpondence
 mapIdx = [[31, 32], [39, 40], [33, 34], [35, 36], [41, 42], [43, 44], [19, 20], [21, 22], \
