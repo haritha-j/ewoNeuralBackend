@@ -140,11 +140,11 @@ else:
     train_client = DataIterator("../dataset/train_dataset.h5", shuffle=True, augment=True, batch_size=batch_size)
     val_client = DataIterator("../dataset/val_dataset.h5", shuffle=False, augment=False, batch_size=batch_size)
 
-
 train_di = train_client.gen()
-train_samples = 52597
+train_samples = 117576
 val_di = val_client.gen()
-val_samples = 2645
+val_samples = 2476
+
 
 # learning rate schedule - equivalent of caffe lr_policy =  "step"
 iterations_per_epoch = train_samples // batch_size
