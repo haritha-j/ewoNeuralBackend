@@ -5,7 +5,6 @@ import re
 import math
 sys.path.append("..")
 
-from coco_eval import CocoEval
 from model import get_training_model
 from ds_generators import DataGeneratorClient, DataIterator
 from optimizers import MultiSGD
@@ -16,14 +15,14 @@ import keras.backend as K
 
 from glob import glob
 
-batch_size = 20
+batch_size = 10
 base_lr = 2e-5
 momentum = 0.9
 weight_decay = 5e-4
 lr_policy =  "step"
 gamma = 0.333
-stepsize = 121000*17 # in original code each epoch is 120k and step change is on 17th epoch
-max_iter = 200000 # 600000
+stepsize = 121746*17 # in original code each epoch is 121746 and step change is on 17th epoch
+max_iter = 200
 use_multiple_gpus = None #2 # set None for 1 gpu, not 1
 
 

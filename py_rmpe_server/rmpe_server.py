@@ -74,7 +74,7 @@ class Server:
                 self.socket.send(np.ascontiguousarray(keypoints))
 
                 num += 1
-                print("%s [%d/%d] aug %0.2f ms (%0.2f im/s), send %0.2f ms" % (self.name, num, keys, augment_time*1000, 1./augment_time,  time() - start - augment_time) )
+                print("%s [%d/%d] aug %0.2f ms (%0.2f im/s), send %0.2f s" % (self.name, num, keys, augment_time*1000, 1./augment_time,  time() - start - augment_time) )
                 start = time()
 
     def produce_headers(self, img, mask, labels, keypoints):

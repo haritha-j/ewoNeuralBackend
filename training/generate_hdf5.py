@@ -19,20 +19,17 @@ val_img_dir = os.path.join(dataset_dir, "val2017")
 val_mask_dir = os.path.join(dataset_dir, "valmask2017")
 
 datasets = [
-    (tr_anno_path, tr_img_dir, tr_mask_dir, "COCO"),
-    (val_anno_path, val_img_dir, val_mask_dir, "COCO")
+    (val_anno_path, val_img_dir, val_mask_dir, "COCO_val"),  # it is important to have 'val' in validation dataset name, look for 'val' below
+    (tr_anno_path, tr_img_dir, tr_mask_dir, "COCO")
 ]
 
-# datasets = [
-#     (val_anno_path, val_img_dir, val_mask_dir, "COCO")
-# ]
 
 joint_all = []
 tr_hdf5_path = os.path.join(dataset_dir, "train_dataset.h5")
 val_hdf5_path = os.path.join(dataset_dir, "val_dataset.h5")
 
 val_size = 2645 # size of validation set
-#val_size = 300
+
 
 def process():
     count = 0
@@ -46,8 +43,9 @@ def process():
         coco = COCO(anno_path)
         ids = list(coco.imgs.keys())
         max_images = len(ids)
-        #for i, img_id in enumerate(ids[744:745]):
-        for i, img_id in enumerate(ids):
+
+        dataset_count = 0
+        for image_index, img_id in enumerate(ids):
             ann_ids = coco.getAnnIds(imgIds=img_id)
             img_anns = coco.loadAnns(ann_ids)
 
@@ -57,40 +55,21 @@ def process():
 
             print("Image ID ", img_id)
 
-            persons = []
-            prev_center = []
+            all_persons = []
 
             for p in range(numPeople):
-
-                # skip this person if parts number is too low or if
-                # segmentation area is too small
-                if img_anns[p]["num_keypoints"] < 5 or img_anns[p]["area"] < 32 * 32:
-                    continue
-
-                anno = img_anns[p]["keypoints"]
 
                 pers = dict()
 
                 person_center = [img_anns[p]["bbox"][0] + img_anns[p]["bbox"][2] / 2,
                                  img_anns[p]["bbox"][1] + img_anns[p]["bbox"][3] / 2]
 
-                # skip this person if the distance to exiting person is too small
-                flag = 0
-                for pc in prev_center:
-                    a = np.expand_dims(pc[:2], axis=0)
-                    b = np.expand_dims(person_center, axis=0)
-                    dist = cdist(a, b)[0]
-                    if dist < pc[2]*0.3:
-                        flag = 1
-                        continue
-
-                if flag == 1:
-                    continue
-
                 pers["objpos"] = person_center
                 pers["bbox"] = img_anns[p]["bbox"]
                 pers["segment_area"] = img_anns[p]["area"]
                 pers["num_keypoints"] = img_anns[p]["num_keypoints"]
+
+                anno = img_anns[p]["keypoints"]
 
                 pers["joint"] = np.zeros((17, 3))
                 for part in range(17):
@@ -106,17 +85,45 @@ def process():
 
                 pers["scale_provided"] = img_anns[p]["bbox"][3] / 368
 
-                persons.append(pers)
+                all_persons.append(pers)
+
+
+            main_persons = []
+            prev_center = []
+
+            for pers in all_persons:
+
+                # skip this person if parts number is too low or if
+                # segmentation area is too small
+                if pers["num_keypoints"] < 5 or pers["segment_area"] < 32 * 32:
+                    continue
+
+                person_center = pers["objpos"]
+
+                # skip this person if the distance to exiting person is too small
+                flag = 0
+                for pc in prev_center:
+                    a = np.expand_dims(pc[:2], axis=0)
+                    b = np.expand_dims(person_center, axis=0)
+                    dist = cdist(a, b)[0]
+                    if dist < pc[2]*0.3:
+                        flag = 1
+                        continue
+
+                if flag == 1:
+                    continue
+
+                main_persons.append(pers)
                 prev_center.append(np.append(person_center, max(img_anns[p]["bbox"][2], img_anns[p]["bbox"][3])))
 
 
-            if len(persons) > 0:
+            for p, person in enumerate(main_persons):
 
                 joint_all.append(dict())
 
                 joint_all[count]["dataset"] = dataset_type
 
-                if count < val_size:
+                if image_index < val_size and 'val' in dataset_type:
                     isValidation = 1
                 else:
                     isValidation = 0
@@ -126,7 +133,7 @@ def process():
                 joint_all[count]["img_width"] = w
                 joint_all[count]["img_height"] = h
                 joint_all[count]["image_id"] = img_id
-                joint_all[count]["annolist_index"] = i
+                joint_all[count]["annolist_index"] = image_index
 
                 # set image path
                 joint_all[count]["img_paths"] = os.path.join(images_dir, '%012d.jpg' % img_id)
@@ -136,12 +143,12 @@ def process():
                                                                   'mask_all_%012d.png' % img_id)
 
                 # set the main person
-                joint_all[count]["objpos"] = persons[0]["objpos"]
-                joint_all[count]["bbox"] = persons[0]["bbox"]
-                joint_all[count]["segment_area"] = persons[0]["segment_area"]
-                joint_all[count]["num_keypoints"] = persons[0]["num_keypoints"]
-                joint_all[count]["joint_self"] = persons[0]["joint"]
-                joint_all[count]["scale_provided"] = persons[0]["scale_provided"]
+                joint_all[count]["objpos"] = main_persons[p]["objpos"]
+                joint_all[count]["bbox"] = main_persons[p]["bbox"]
+                joint_all[count]["segment_area"] = main_persons[p]["segment_area"]
+                joint_all[count]["num_keypoints"] = main_persons[p]["num_keypoints"]
+                joint_all[count]["joint_self"] = main_persons[p]["joint"]
+                joint_all[count]["scale_provided"] = main_persons[p]["scale_provided"]
 
                 # set other persons
                 joint_all[count]["joint_others"] = []
@@ -151,20 +158,30 @@ def process():
                 joint_all[count]["segment_area_other"] = []
                 joint_all[count]["num_keypoints_other"] = []
 
-                for ot in range(1, len(persons)):
-                    joint_all[count]["joint_others"].append(persons[ot]["joint"])
-                    joint_all[count]["scale_provided_other"].append(persons[ot]["scale_provided"])
-                    joint_all[count]["objpos_other"].append(persons[ot]["objpos"])
-                    joint_all[count]["bbox_other"].append(persons[ot]["bbox"])
-                    joint_all[count]["segment_area_other"].append(persons[ot]["segment_area"])
-                    joint_all[count]["num_keypoints_other"].append(persons[ot]["num_keypoints"])
+                lenOthers = 0
+                for ot, operson in enumerate(all_persons):
 
-                joint_all[count]["people_index"] = 0
-                lenOthers = len(persons) - 1
+                    if person is operson:
+                        assert not "people_index" in joint_all[count], "several main persons? couldn't be"
+                        joint_all[count]["people_index"] = ot
+                        continue
 
+                    if operson["num_keypoints"]==0:
+                        continue
+
+                    joint_all[count]["joint_others"].append(all_persons[ot]["joint"])
+                    joint_all[count]["scale_provided_other"].append(all_persons[ot]["scale_provided"])
+                    joint_all[count]["objpos_other"].append(all_persons[ot]["objpos"])
+                    joint_all[count]["bbox_other"].append(all_persons[ot]["bbox"])
+                    joint_all[count]["segment_area_other"].append(all_persons[ot]["segment_area"])
+                    joint_all[count]["num_keypoints_other"].append(all_persons[ot]["num_keypoints"])
+
+                    lenOthers += 1
+
+                assert "people_index" in joint_all[count], "No main person index"
                 joint_all[count]["numOtherPeople"] = lenOthers
-
                 count += 1
+                dataset_count += 1
 
 
 def writeHDF5():

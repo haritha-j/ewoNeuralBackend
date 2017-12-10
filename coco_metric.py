@@ -311,10 +311,10 @@ def validation(model, dump_name, validation_ids=None, dataset='val2017'):
 
     if validation_ids == None:
         validation_ids = cocoGt.getImgIds()
-    validation_ids = validation_ids
 
     resFile = '%s/results/%s_%s_%s100_results.json'
     resFile = resFile % (dataDir, prefix, dataset, dump_name)
+    os.makedirs(os.path.dirname(resFile), exist_ok=True)
 
     keypoints = predict_many(cocoGt, os.path.join(dataDir, dataset), validation_ids, params, model, model_params)
     format_results(keypoints, resFile)
