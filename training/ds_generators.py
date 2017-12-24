@@ -169,14 +169,14 @@ class DataGeneratorClient(DataIteratorBase):
 
 class DataIterator(DataIteratorBase):
 
-    def __init__(self, file, shuffle=True, augment=True, batch_size=10, limit=None):
+    def __init__(self, file, config, shuffle=True, augment=True, batch_size=10, limit=None):
 
         super(DataIterator, self).__init__(batch_size)
 
         self.limit = limit
         self.records = 0
 
-        self.raw_data_iterator = RawDataIterator(file, shuffle=shuffle, augment=augment)
+        self.raw_data_iterator = RawDataIterator(file, config, shuffle=shuffle, augment=augment)
         self.generator = self.raw_data_iterator.gen()
 
 

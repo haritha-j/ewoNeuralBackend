@@ -8,17 +8,19 @@ from time import time
 sys.path.append("..")
 
 from py_rmpe_data_iterator import RawDataIterator
+from py_rmpe_config import RmpeCocoConfig, RmpeMPIIConfig
 
 
 class Server:
 
     # these methods all called in parent process
 
-    def __init__(self, h5file, port, name, shuffle, augment):
+    def __init__(self, h5files, configs, port, name, shuffle, augment):
 
         self.name = name
         self.port = port
-        self.h5file = h5file
+        self.h5files = h5files
+        self.configs = configs
 
         self.shuffle = shuffle
         self.augment = augment
@@ -26,7 +28,6 @@ class Server:
         self.process = Process(target=Server.loop, args=(self,))
         self.process.daemon = True
         self.process.start()
-
 
 
     def join(self):
@@ -48,7 +49,7 @@ class Server:
         print("%s: Child process init... " % self.name)
         self.init()
 
-        iterator = RawDataIterator(self.h5file, shuffle=self.shuffle, augment=self.augment)
+        iterator = RawDataIterator(self.h5files, self.configs, shuffle=self.shuffle, augment=self.augment)
 
         print("%s: Loop started... " % self.name)
 
@@ -62,7 +63,7 @@ class Server:
             print("%s: generation %s, %d images " % (self.name, generation, keys))
 
             start = time()
-            for (image, mask, labels, keypoints) in iterator.gen():
+            for (image, mask, labels, keypoints, read_time, aug_time) in iterator.gen(timing=True):
 
                 augment_time = time()-start
 
@@ -74,7 +75,7 @@ class Server:
                 self.socket.send(np.ascontiguousarray(keypoints))
 
                 num += 1
-                print("%s [%d/%d] aug %0.2f ms (%0.2f im/s), send %0.2f s" % (self.name, num, keys, augment_time*1000, 1./augment_time,  time() - start - augment_time) )
+                print("%s [%d/%d] read/decompress %0.2f ms, aug %0.2f ms (%0.2f im/s), send %0.2f s" % (self.name, num, keys, read_time*1000, aug_time*1000, 1./aug_time,  time() - start - aug_time) )
                 start = time()
 
     def produce_headers(self, img, mask, labels, keypoints):
@@ -91,10 +92,14 @@ class Server:
 
 def main():
 
-    train = Server("../dataset/train_dataset.h5", 5555, "Train", shuffle=False, augment=True)
-    val = Server("../dataset/val_dataset.h5", 5556, "Val", shuffle=False, augment=False)
+#    train =  Server(["../dataset/train_dataset.h5"],      [RmpeCocoConfig], 5555, "Train", shuffle=True,  augment=True)
+#    val =    Server(["../dataset/val_dataset.h5"],        [RmpeCocoConfig], 5556, "Val",   shuffle=False, augment=False)
+#    train2 = Server(["../dataset/coco_train_dataset.h5"], [RmpeCocoConfig], 5557, "Train", shuffle=True,  augment=True)
+#    val2 =   Server(["../dataset/coco_val_dataset.h5"],   [RmpeCocoConfig], 5558, "Val",   shuffle=False, augment=False)
 
-    processes = [val, train]
+    val =  Server(["../dataset/coco_val_dataset.h5", "../dataset/mpii_val_dataset.h5"],  [RmpeCocoConfig, RmpeMPIIConfig], 5556, "Val", shuffle=True, augment=True)
+
+    processes = [val]
 
     while None in [p.process.exitcode for p in processes]:
 

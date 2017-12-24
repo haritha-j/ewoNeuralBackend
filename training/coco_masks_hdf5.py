@@ -6,7 +6,6 @@ import numpy as np
 import cv2
 import os
 import os.path
-import struct
 import h5py
 import json
 
@@ -65,14 +64,17 @@ def make_mask(img_dir, img_id, img_anns, coco):
     else:
         raise Exception("crowd segments > 1")
 
-    return img, mask_miss * 255
+    mask_miss = mask_miss.astype(np.uint8)
+    mask_miss *= 255
+
+    return img, mask_miss
 
 def process_image(image_rec, img_id, image_index, img_anns, dataset_type):
 
+    print("Image ID: ", img_id)
+
     numPeople = len(img_anns)
     h, w = image_rec['height'], image_rec['width']
-
-    print("Image ID: ", img_id)
 
     all_persons = []
 
@@ -183,7 +185,7 @@ def process_image(image_rec, img_id, image_index, img_anns, dataset_type):
         yield instance
 
 
-def writeImage(grp, data, img, mask_miss, count):
+def writeImage(grp, img_grp, data, img, mask_miss, count, image_id, mask_grp=None):
 
     serializable_meta = data
     serializable_meta['count'] = count
@@ -194,9 +196,22 @@ def writeImage(grp, data, img, mask_miss, count):
     assert len(serializable_meta['scale_provided']) == 1 + nop, [len(serializable_meta['scale_provided']), 1 + nop]
     assert len(serializable_meta['objpos']) == 1 + nop, [len(serializable_meta['objpos']), 1 + nop]
 
-    img4ch = np.concatenate((img, mask_miss[..., None]), axis=2)
+    img_key = "%012d" % image_id
+    if not img_key in img_grp:
+
+        if mask_grp is None:
+            img_and_mask = np.concatenate((img, mask_miss[..., None]), axis=2)
+            img_ds = img_grp.create_dataset(img_key, data=img_and_mask, chunks=None)
+        else:
+            _, img_bin = cv2.imencode(".jpg", img)
+            _, img_mask = cv2.imencode(".png", mask_miss)
+            img_ds1 = img_grp.create_dataset(img_key, data=img_bin, chunks=None)
+            img_ds2 = mask_grp.create_dataset(img_key, data=img_mask, chunks=None)
+
+
     key = '%07d' % count
-    ds = grp.create_dataset(key, data=img4ch, chunks=None)
+    required = { 'image':img_key, 'joints': serializable_meta['joints'], 'objpos': serializable_meta['objpos'], 'scale_provided': serializable_meta['scale_provided'] }
+    ds = grp.create_dataset(key, data=json.dumps(required), chunks=None)
     ds.attrs['meta'] = json.dumps(serializable_meta)
 
     print('Writing sample %d' % count)
@@ -205,13 +220,16 @@ def writeImage(grp, data, img, mask_miss, count):
 def process():
 
     tr_h5 = h5py.File(tr_hdf5_path, 'w')
-    tr_grp = tr_h5.create_group("datum")
+    tr_grp = tr_h5.create_group("dataset")
     tr_write_count = 0
+    tr_grp_img = tr_h5.create_group("images")
+    tr_grp_mask = tr_h5.create_group("masks")
 
     val_h5 = h5py.File(val_hdf5_path, 'w')
-    val_grp = val_h5.create_group("datum")
+    val_grp = val_h5.create_group("dataset")
     val_write_count = 0
-
+    val_grp_img = val_h5.create_group("images")
+    val_grp_mask = val_h5.create_group("masks")
 
     for _, ds in enumerate(datasets):
 
@@ -227,17 +245,26 @@ def process():
             img_anns = coco.loadAnns(ann_ids)
             image_rec = coco.imgs[img_id]
 
+            img = None
+            mask_miss = None
+            cached_img_id = None
+
             for data in process_image(image_rec, img_id, image_index, img_anns, dataset_type):
 
-                img, mask_miss = make_mask(img_dir, data['image_id'], img_anns, coco)
+                if cached_img_id!=data['image_id']:
+                    assert img_id == data['image_id']
+                    cached_img_id = data['image_id']
+                    img, mask_miss = make_mask(img_dir, cached_img_id, img_anns, coco)
 
                 if data['isValidation']:
-                    writeImage(val_grp, data, img, mask_miss, val_write_count)
+                    writeImage(val_grp, val_grp_img, data, img, mask_miss, val_write_count, cached_img_id, val_grp_mask)
                     val_write_count += 1
                 else:
-                    writeImage(tr_grp, data, img, mask_miss, tr_write_count)
+                    writeImage(tr_grp, tr_grp_img, data, img, mask_miss, tr_write_count, cached_img_id, tr_grp_mask)
                     tr_write_count += 1
 
+    tr_h5.close()
+    val_h5.close()
 
 if __name__ == '__main__':
     process()

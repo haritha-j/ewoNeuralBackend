@@ -15,6 +15,8 @@ import keras.backend as K
 
 from glob import glob
 
+from py_rmpe_server.py_rmpe_config import RmpeCocoConfig
+
 batch_size = 10
 base_lr = 2e-5
 momentum = 0.9
@@ -137,13 +139,13 @@ if use_client_gen:
     train_client = DataGeneratorClient(port=5555, host="localhost", hwm=160, batch_size=batch_size)
     val_client = DataGeneratorClient(port=5556, host="localhost", hwm=160, batch_size=batch_size)
 else:
-    train_client = DataIterator("../dataset/train_dataset.h5", shuffle=True, augment=True, batch_size=batch_size)
-    val_client = DataIterator("../dataset/val_dataset.h5", shuffle=False, augment=False, batch_size=batch_size)
+    train_client = DataIterator("../dataset/coco_train_dataset.h5", RmpeCocoConfig, shuffle=True, augment=True, batch_size=batch_size)
+    val_client = DataIterator("../dataset/coco_val_dataset.h5", RmpeCocoConfig, shuffle=False, augment=False, batch_size=batch_size)
 
 train_di = train_client.gen()
 train_samples = 117576
 val_di = val_client.gen()
-val_samples = 2476
+val_samples = 2475
 
 
 # learning rate schedule - equivalent of caffe lr_policy =  "step"

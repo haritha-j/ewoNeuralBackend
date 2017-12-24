@@ -68,7 +68,9 @@ class RmpeCocoConfig:
     parts_dict = dict(zip(parts, range(num_parts)))
 
     @staticmethod
-    def convert(joints):
+    def convert(meta):
+
+        joints = np.array(meta['joints'])
 
         result = np.zeros((joints.shape[0], RmpeGlobalConfig.num_parts, 3), dtype=np.float)
         result[:,:,2]=2.  # 2 - abstent, 1 visible, 0 - invisible
@@ -83,8 +85,7 @@ class RmpeCocoConfig:
         RshoC = RmpeCocoConfig.parts_dict['Rsho']
         LshoC = RmpeCocoConfig.parts_dict['Lsho']
 
-
-        # no neck in coco database, we calculate it as averahe of shoulders
+        # no neck in coco database, we calculate it as average of shoulders
         # TODO: we use 0 - hidden, 1 visible, 2 absent - it is not coco values they processed by generate_hdf5
         both_shoulders_known = (joints[:, LshoC, 2]<2)  &  (joints[:, RshoC, 2]<2)
         result[both_shoulders_known, neckG, 0:2] = (joints[both_shoulders_known, RshoC, 0:2] +
@@ -92,9 +93,11 @@ class RmpeCocoConfig:
         result[both_shoulders_known, neckG, 2] = np.minimum(joints[both_shoulders_known, RshoC, 2],
                                                                  joints[both_shoulders_known, LshoC, 2])
 
-        return result
+        meta['joints'] = result
 
-class RpmeMPIIConfig:
+        return meta
+
+class RmpeMPIIConfig:
 
     parts = ["HeadTop", "Neck", "RShoulder", "RElbow", "RWrist", "LShoulder", "LElbow", "LWrist", "RHip", "RKnee",
              "RAnkle", "LHip", "LKnee", "LAnkle"]
@@ -105,7 +108,9 @@ class RpmeMPIIConfig:
 
 
     @staticmethod
-    def convert(joints):
+    def convert(meta):
+
+        #TODO: meta['scale_self']=meta['scale_self']*328/200
         raise "Not implemented"
 
 

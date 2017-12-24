@@ -12,9 +12,9 @@ import numpy as np
 import pandas as pd
 import cv2
 
-servers = [('py-server', 'localhost', 5556), ('cpp-server', 'localhost', 5557)]
+servers = [('py-server', 'localhost', 5556), ('new-server', 'localhost', 5558)]
 clients = {}
-save_to = 'comparator'  # save new server to output, c++ server to original and compare images
+save_to = 'comparator-hdf5'  # save new server to output, c++ server to original and compare images
 
 def cmp_pics(num, lhsd, rhsd, lhsn, rhsn):
     diff = lhsd.astype(float) - rhsd.astype(float)

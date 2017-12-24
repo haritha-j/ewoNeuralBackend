@@ -22,7 +22,7 @@ mask_pattern[grid!=1]=(128,128,128)
 
 heat_pattern[...] = (0,0,255)
 
-save_to = 'augmented'  # save new server to output, c++ server to original and compare images
+save_to = 'old_val'  # save new server to output, c++ server to original and compare images
 
 
 def save_images(num, image, mask, paf):
