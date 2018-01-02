@@ -8,19 +8,19 @@ from time import time
 sys.path.append("..")
 
 from py_rmpe_data_iterator import RawDataIterator
-from py_rmpe_config import RmpeCocoConfig, RmpeMPIIConfig
+from config import COCOSourceConfig, MPIISourceConfig, GetConfig
 
 
 class Server:
 
     # these methods all called in parent process
 
-    def __init__(self, h5files, configs, port, name, shuffle, augment):
+    def __init__(self, global_config, configs, port, name, shuffle, augment):
 
         self.name = name
         self.port = port
-        self.h5files = h5files
         self.configs = configs
+        self.global_config = global_config
 
         self.shuffle = shuffle
         self.augment = augment
@@ -40,7 +40,7 @@ class Server:
 
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PUSH)
-        self.socket.set_hwm(1) #TODO: put 160 in production, made for debug purposes
+        self.socket.set_hwm(160)
         self.socket.bind("tcp://*:%s" % self.port)
 
     @staticmethod
@@ -49,7 +49,7 @@ class Server:
         print("%s: Child process init... " % self.name)
         self.init()
 
-        iterator = RawDataIterator(self.h5files, self.configs, shuffle=self.shuffle, augment=self.augment)
+        iterator = RawDataIterator(self.global_config, self.configs, shuffle=self.shuffle, augment=self.augment)
 
         print("%s: Loop started... " % self.name)
 
@@ -80,7 +80,7 @@ class Server:
 
     def produce_headers(self, img, mask, labels, keypoints):
 
-        header_data = {"descr": img.dtype.str, "shape": img.shape, "fortran_order": False}
+        header_data = {"descr": img.dtype.str, "shape": img.shape, "fortran_order": False, "normalized": True }
         header_mask = {"descr": mask.dtype.str, "shape": mask.shape,   "fortran_order": False}
         header_label = {"descr": labels.dtype.str,  "shape": labels.shape, "fortran_order": False}
         header_keypoints = {"descr": keypoints.dtype.str,  "shape": keypoints.shape, "fortran_order": False}
@@ -92,14 +92,10 @@ class Server:
 
 def main():
 
-#    train =  Server(["../dataset/train_dataset.h5"],      [RmpeCocoConfig], 5555, "Train", shuffle=True,  augment=True)
-#    val =    Server(["../dataset/val_dataset.h5"],        [RmpeCocoConfig], 5556, "Val",   shuffle=False, augment=False)
-#    train2 = Server(["../dataset/coco_train_dataset.h5"], [RmpeCocoConfig], 5557, "Train", shuffle=True,  augment=True)
-#    val2 =   Server(["../dataset/coco_val_dataset.h5"],   [RmpeCocoConfig], 5558, "Val",   shuffle=False, augment=False)
+    train =  Server(GetConfig("Canonical"), COCOSourceConfig("../dataset/coco_train_dataset.h5"), 5555, "Train", shuffle=True,  augment=True)
+    val =    Server(GetConfig("Canonical"), COCOSourceConfig("../dataset/coco_val_dataset.h5"), 5556, "Val",   shuffle=False, augment=False)
 
-    val =  Server(["../dataset/coco_val_dataset.h5", "../dataset/mpii_val_dataset.h5"],  [RmpeCocoConfig, RmpeMPIIConfig], 5556, "Val", shuffle=True, augment=True)
-
-    processes = [val]
+    processes = [train, val]
 
     while None in [p.process.exitcode for p in processes]:
 

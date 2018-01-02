@@ -5,7 +5,6 @@ import json
 import numpy as np
 import cv2
 
-from py_rmpe_server.py_rmpe_config import RmpeGlobalConfig, RmpeCocoConfig
 from py_rmpe_server.py_rmpe_transformer import Transformer, AugmentSelection
 from py_rmpe_server.py_rmpe_heatmapper import Heatmapper
 
@@ -13,18 +12,21 @@ from time import time
 
 class RawDataIterator:
 
-    def __init__(self, h5files, configs, shuffle = True, augment = True):
+    def __init__(self, global_config, configs, shuffle = True, augment = True):
 
-        if not isinstance(h5files, (list,tuple)):
-            h5files = [h5files]
+        self.global_config = global_config
+
+        if not isinstance(configs, (list,tuple)):
             configs = [configs]
+            h5files = [c.source() for c in configs]
 
         self.h5files = h5files
         self.configs = configs
         self.h5s = [h5py.File(fname, "r") for fname in self.h5files]
         self.datums = [ h5['datum'] if 'datum' in h5 else (h5['dataset'], h5['images'], h5['masks'] if 'masks' in h5 else None) for h5 in self.h5s ]
 
-        self.heatmapper = Heatmapper()
+        self.heatmapper = Heatmapper(global_config)
+        self.transformer = Transformer(global_config)
         self.augment = augment
         self.shuffle = shuffle
 
@@ -52,7 +54,7 @@ class RawDataIterator:
 
             aug_start = time()
             image, mask, meta, labels = self.transform_data(image, mask, meta)
-            image = np.transpose(image, (2, 0, 1))
+            image = image/256.0 - 0.5 # normalize image to save gpu/cpu time for keras
 
             if timing:
                 yield image, mask, labels, meta['joints'], time()-read_start, time()-aug_start
@@ -74,7 +76,7 @@ class RawDataIterator:
             return self.read_data_old(datum, key, config)
 
 
-    def read_data_old(self, datum, key, config=RmpeCocoConfig):
+    def read_data_old(self, datum, key, config):
 
         entry = datum[key]
 
@@ -86,7 +88,7 @@ class RawDataIterator:
         meta["scale_provided"] = debug["scale_provided"]
         meta["joints"] = debug["joints"]
 
-        meta = config.convert(meta)
+        meta = config.convert(meta, self.global_config)
         data = entry.value
 
         if data.shape[0] <= 6:
@@ -109,7 +111,7 @@ class RawDataIterator:
 
         meta = json.loads(entry.value)
         debug = json.loads(entry.attrs['meta'])
-        meta = config.convert(meta)
+        meta = config.convert(meta, self.global_config)
 
         img = images[meta['image']].value
         mask_miss = None
@@ -135,8 +137,8 @@ class RawDataIterator:
 
     def transform_data(self, img, mask, meta):
 
-        aug = AugmentSelection.random() if self.augment else AugmentSelection.unrandom()
-        img, mask, meta = Transformer.transform(img, mask, meta, aug=aug)
+        aug = None if self.augment else AugmentSelection.unrandom()
+        img, mask, meta = self.transformer.transform(img, mask, meta, aug=aug)
         labels = self.heatmapper.create_heatmaps(meta['joints'], mask)
 
         return img, mask, meta, labels

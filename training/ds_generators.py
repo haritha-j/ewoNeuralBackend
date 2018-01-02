@@ -2,6 +2,7 @@ import numpy as np
 import zmq
 from ast import literal_eval as make_tuple
 from py_rmpe_server.py_rmpe_data_iterator import RawDataIterator
+from time import time
 
 import six
 if six.PY3:
@@ -12,15 +13,22 @@ else:
 
 class DataIteratorBase:
 
-    def __init__(self, batch_size = 10):
+    def __init__(self, global_config, batch_size = 10):
 
+        self.global_config = global_config
         self.batch_size = batch_size
 
-        self.split_point = 38
-        self.vec_num = 38
-        self.heat_num = 19
+        self.split_point = global_config.paf_layers
+        self.vec_num = global_config.paf_layers
+        self.heat_num = global_config.heat_layers + 1
 
-        self.keypoints = [None]*self.batch_size #this is not passed to NN, will be accessed by accuracy calculation
+        self.image_shape = (self.batch_size, self.global_config.width, self.global_config.height, 3)
+        self.mask1_shape = (self.batch_size, self.global_config.width//self.global_config.stride, self.global_config.height//self.global_config.stride, self.vec_num)
+        self.mask2_shape = (self.batch_size, self.global_config.width//self.global_config.stride, self.global_config.height//self.global_config.stride, self.heat_num)
+        self.ypafs1_shape = (self.batch_size, self.global_config.width//self.global_config.stride, self.global_config.height//self.global_config.stride, self.vec_num)
+        self.yheat2_shape = (self.batch_size, self.global_config.width//self.global_config.stride, self.global_config.height//self.global_config.stride, self.heat_num)
+
+        #self.keypoints = [None]*self.batch_size # this is never passed to NN, will be accessed by accuracy calculation
 
 
     def gen_raw(self): # this function used for test purposes in py_rmpe_server
@@ -28,12 +36,15 @@ class DataIteratorBase:
         while True:
             yield tuple(self._recv_arrays())
 
+
     def gen(self):
-        batches_x, batches_x1, batches_x2, batches_y1, batches_y2 = \
-            [None]*self.batch_size, [None]*self.batch_size, [None]*self.batch_size, \
-            [None]*self.batch_size, [None]*self.batch_size
 
         sample_idx = 0
+        batches_x = np.empty(self.image_shape)
+        batches_x1 = np.zeros(self.mask1_shape)
+        batches_x2 = np.zeros(self.mask2_shape)
+        batches_y1 = np.empty(self.ypafs1_shape)
+        batches_y2 = np.empty(self.yheat2_shape)
 
         for foo in self.gen_raw():
 
@@ -43,48 +54,36 @@ class DataIteratorBase:
                 data_img, mask_img, label = foo
                 kpts = None
 
-            # image
-            dta_img = np.transpose(data_img, (1, 2, 0))
-            batches_x[sample_idx]=dta_img[np.newaxis, ...]
+            batches_x[sample_idx] = data_img[np.newaxis, ...]
+            batches_x1[sample_idx,:,:,:] = mask_img[:,:,np.newaxis]
+            batches_x2[sample_idx,:,:,:] = mask_img[:,:,np.newaxis]
 
-            # mask - the same for vec_weights, heat_weights
-            vec_weights = np.repeat(mask_img[:,:,np.newaxis], self.vec_num, axis=2)
-            heat_weights = np.repeat(mask_img[:,:,np.newaxis], self.heat_num, axis=2)
+            batches_y1[sample_idx] = label[np.newaxis, :, :, :self.split_point ]
+            batches_y2[sample_idx] = label[np.newaxis, :, :, self.split_point: ]
 
-            batches_x1[sample_idx]=vec_weights[np.newaxis, ...]
-            batches_x2[sample_idx]=heat_weights[np.newaxis, ...]
-
-            # label
-            vec_label = label[:self.split_point, :, :]
-            vec_label = np.transpose(vec_label, (1, 2, 0))
-            heat_label = label[self.split_point:, :, :]
-            heat_label = np.transpose(heat_label, (1, 2, 0))
-
-            batches_y1[sample_idx]=vec_label[np.newaxis, ...]
-            batches_y2[sample_idx]=heat_label[np.newaxis, ...]
-
-            self.keypoints[sample_idx] = kpts
+            #self.keypoints[sample_idx] = kpts
 
             sample_idx += 1
 
             if sample_idx == self.batch_size:
                 sample_idx = 0
 
-                batch_x = np.concatenate(batches_x)
-                batch_x1 = np.concatenate(batches_x1)
-                batch_x2 = np.concatenate(batches_x2)
-                batch_y1 = np.concatenate(batches_y1)
-                batch_y2 = np.concatenate(batches_y2)
+                yield [batches_x, batches_x1,  batches_x2], \
+                      [batches_y1, batches_y2,
+                        batches_y1, batches_y2,
+                        batches_y1, batches_y2,
+                        batches_y1, batches_y2,
+                        batches_y1, batches_y2,
+                        batches_y1, batches_y2]
 
-                yield [batch_x, batch_x1,  batch_x2], \
-                       [batch_y1, batch_y2,
-                        batch_y1, batch_y2,
-                        batch_y1, batch_y2,
-                        batch_y1, batch_y2,
-                        batch_y1, batch_y2,
-                        batch_y1, batch_y2]
+                # we should recreate this arrays becase we in multiple threads, can't overwrite
+                batches_x = np.empty(self.image_shape)
+                batches_x1 = np.empty(self.mask1_shape)
+                batches_x2 = np.empty(self.mask2_shape)
+                batches_y1 = np.empty(self.ypafs1_shape)
+                batches_y2 = np.empty(self.yheat2_shape)
 
-                self.keypoints = [None] * self.batch_size
+                #self.keypoints = [None] * self.batch_size
 
     def keypoints(self):
         return self.keypoints
@@ -92,9 +91,9 @@ class DataIteratorBase:
 
 class DataGeneratorClient(DataIteratorBase):
 
-    def __init__(self, host, port, hwm=20, batch_size=10, limit=None):
+    def __init__(self, global_config, host, port, hwm=20, batch_size=10, limit=None):
 
-        super(DataGeneratorClient, self).__init__(batch_size)
+        super(DataGeneratorClient, self).__init__(global_config, batch_size)
 
         self.limit = limit
         self.records = 0
@@ -169,14 +168,14 @@ class DataGeneratorClient(DataIteratorBase):
 
 class DataIterator(DataIteratorBase):
 
-    def __init__(self, file, config, shuffle=True, augment=True, batch_size=10, limit=None):
+    def __init__(self, global_config, config, shuffle=True, augment=True, batch_size=10, limit=None):
 
-        super(DataIterator, self).__init__(batch_size)
+        super(DataIterator, self).__init__(global_config, batch_size)
 
         self.limit = limit
         self.records = 0
 
-        self.raw_data_iterator = RawDataIterator(file, config, shuffle=shuffle, augment=augment)
+        self.raw_data_iterator = RawDataIterator(global_config, config, shuffle=shuffle, augment=augment)
         self.generator = self.raw_data_iterator.gen()
 
 

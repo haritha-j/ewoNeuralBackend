@@ -5,8 +5,6 @@ from math import cos, sin, pi
 import cv2
 import random
 
-from py_rmpe_server.py_rmpe_config import RmpeGlobalConfig, TransformationParams
-
 class AugmentSelection:
 
     def __init__(self, flip=False, degree = 0., crop = (0,0), scale = 1.):
@@ -16,13 +14,13 @@ class AugmentSelection:
         self.scale = scale
 
     @staticmethod
-    def random():
-        flip = random.uniform(0.,1.) > TransformationParams.flip_prob
-        degree = random.uniform(-1.,1.) * TransformationParams.max_rotate_degree
-        scale = (TransformationParams.scale_max - TransformationParams.scale_min)*random.uniform(0.,1.)+TransformationParams.scale_min \
-            if random.uniform(0.,1.) > TransformationParams.scale_prob else 1. # TODO: see 'scale improbability' TODO above
-        x_offset = int(random.uniform(-1.,1.) * TransformationParams.center_perterb_max);
-        y_offset = int(random.uniform(-1.,1.) * TransformationParams.center_perterb_max);
+    def random(transform_params):
+        flip = random.uniform(0.,1.) > transform_params.flip_prob
+        degree = random.uniform(-1.,1.) * transform_params.max_rotate_degree
+        scale = (transform_params.scale_max - transform_params.scale_min)*random.uniform(0.,1.)+transform_params.scale_min \
+            if random.uniform(0.,1.) > transform_params.scale_prob else 1. # TODO: see 'scale improbability' TODO above
+        x_offset = int(random.uniform(-1.,1.) * transform_params.center_perterb_max);
+        y_offset = int(random.uniform(-1.,1.) * transform_params.center_perterb_max);
 
         return AugmentSelection(flip, degree, (x_offset,y_offset), scale)
 
@@ -36,7 +34,7 @@ class AugmentSelection:
 
         return AugmentSelection(flip, degree, (x_offset,y_offset), scale)
 
-    def affine(self, center, scale_self):
+    def affine(self, center, scale_self, config):
 
         # the main idea: we will do all image transformations with one affine matrix.
         # this saves lot of cpu and make code significantly shorter
@@ -46,7 +44,7 @@ class AugmentSelection:
         A = self.scale * cos(self.degree / 180. * pi )
         B = self.scale * sin(self.degree / 180. * pi )
 
-        scale_size = TransformationParams.target_dist / scale_self * self.scale
+        scale_size = config.transform_params.target_dist / scale_self * self.scale
 
         (width, height) = center
         center_x = width + self.crop[0]
@@ -68,8 +66,8 @@ class AugmentSelection:
                           [ 0., 1., 0. ],
                           [ 0., 0., 1. ]] )
 
-        center2center = np.array( [[ 1., 0., RmpeGlobalConfig.width//2],
-                                   [ 0., 1., RmpeGlobalConfig.height//2 ],
+        center2center = np.array( [[ 1., 0., config.width//2],
+                                   [ 0., 1., config.height//2 ],
                                    [ 0., 0., 1. ]] )
 
         # order of combination is reversed
@@ -79,19 +77,23 @@ class AugmentSelection:
 
 class Transformer:
 
-    @staticmethod
-    def transform(img, mask, meta, aug=AugmentSelection.random()):
+    def __init__(self, config):
+
+        self.config = config
+
+    def transform(self, img, mask, meta, aug = None):
+
+        if aug is None:
+            aug = AugmentSelection.random(self.config.transform_params)
 
         # warp picture and mask
-        M = aug.affine(meta['objpos'][0], meta['scale_provided'][0])
+        M = aug.affine(meta['objpos'][0], meta['scale_provided'][0], self.config)
 
         # TODO: need to understand this, scale_provided[0] is height of main person divided by 368, caclulated in generate_hdf5.py
         # print(img.shape)
-        img = cv2.warpAffine(img, M, (RmpeGlobalConfig.height, RmpeGlobalConfig.width), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=(127,127,127))
-        mask = cv2.warpAffine(mask, M, (RmpeGlobalConfig.height, RmpeGlobalConfig.width), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=255)
-        mask = cv2.resize(mask, RmpeGlobalConfig.mask_shape, interpolation=cv2.INTER_CUBIC)  # TODO: should be combined with warp for speed
-        #_, mask = cv2.threshold(mask, 128, 255, cv2.THRESH_BINARY)
-        #assert np.all((mask == 0) | (mask == 255)), "Interpolation of mask should be thresholded only 0 or 255\n" + str(mask)
+        img = cv2.warpAffine(img, M, (self.config.height, self.config.width), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=(127,127,127))
+        mask = cv2.warpAffine(mask, M, (self.config.height, self.config.width), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=255)
+        mask = cv2.resize(mask, self.config.mask_shape, interpolation=cv2.INTER_CUBIC)  # TODO: should be combined with warp for speed
         mask = mask.astype(np.float) / 255.
 
         # warp key points
@@ -105,10 +107,10 @@ class Transformer:
         # we just made image flip, i.e. right leg just became left leg, and vice versa
 
         if aug.flip:
-            tmpLeft = meta['joints'][:, RmpeGlobalConfig.leftParts, :]
-            tmpRight = meta['joints'][:, RmpeGlobalConfig.rightParts, :]
-            meta['joints'][:, RmpeGlobalConfig.leftParts, :] = tmpRight
-            meta['joints'][:, RmpeGlobalConfig.rightParts, :] = tmpLeft
+            tmpLeft = meta['joints'][:, self.config.leftParts, :]
+            tmpRight = meta['joints'][:, self.config.rightParts, :]
+            meta['joints'][:, self.config.leftParts, :] = tmpRight
+            meta['joints'][:, self.config.rightParts, :] = tmpLeft
 
 
         return img, mask, meta
