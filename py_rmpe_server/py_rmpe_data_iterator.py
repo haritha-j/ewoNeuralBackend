@@ -18,9 +18,8 @@ class RawDataIterator:
 
         if not isinstance(configs, (list,tuple)):
             configs = [configs]
-            h5files = [c.source() for c in configs]
 
-        self.h5files = h5files
+        self.h5files = [c.source() for c in configs]
         self.configs = configs
         self.h5s = [h5py.File(fname, "r") for fname in self.h5files]
         self.datums = [ h5['datum'] if 'datum' in h5 else (h5['dataset'], h5['images'], h5['masks'] if 'masks' in h5 else None) for h5 in self.h5s ]
@@ -53,8 +52,20 @@ class RawDataIterator:
             image, mask, meta, debug = self.read_data(num, key)
 
             aug_start = time()
-            image, mask, meta, labels = self.transform_data(image, mask, meta)
-            image = image/256.0 - 0.5 # normalize image to save gpu/cpu time for keras
+
+            # transform picture
+            assert mask.dtype == np.uint8, mask.dtype
+            image, mask, meta = self.transformer.transform(image, mask, meta, aug=None if self.augment else AugmentSelection.unrandom())
+            assert mask.dtype == np.float, mask.dtype
+
+            # we need layered mask on next stage
+            mask = self.configs[num].convert_mask(mask, self.global_config)
+
+            # create heatmaps and pafs
+            labels = self.heatmapper.create_heatmaps(meta['joints'], mask)
+
+            # normalize image to save gpu/cpu time for keras
+            image = image/256.0 - 0.5
 
             if timing:
                 yield image, mask, labels, meta['joints'], time()-read_start, time()-aug_start
@@ -130,19 +141,10 @@ class RawDataIterator:
                     mask_miss = cv2.imdecode(mask_miss, flags = -1)
 
         if mask_miss is None:
-            mask_miss = 255*np.ones((img.shape[0], img.shape[1]))
+            mask_miss = np.full((img.shape[0], img.shape[1]), fill_value=255, dtype=np.uint8)
+
 
         return img, mask_miss, meta, debug
-
-
-    def transform_data(self, img, mask, meta):
-
-        aug = None if self.augment else AugmentSelection.unrandom()
-        img, mask, meta = self.transformer.transform(img, mask, meta, aug=aug)
-        labels = self.heatmapper.create_heatmaps(meta['joints'], mask)
-
-        return img, mask, meta, labels
-
 
     def __del__(self):
 

@@ -24,12 +24,13 @@ class Heatmapper:
         self.grid_x = np.arange(width)*stride + stride/2-0.5
         self.grid_y = np.arange(height)*stride + stride/2-0.5
 
-        self.Y, self.X = np.mgrid[0:self.config.height:stride,0:self.config.width:stride]
+        self.Y, self.X = np.mgrid[0:self.config.height:stride, 0:self.config.width:stride]
 
         # TODO: check it again
         # basically we should use center of grid, but in this place classic implementation uses left-top point.
         # self.X = self.X + stride / 2 - 0.5
         # self.Y = self.Y + stride / 2 - 0.5
+
 
     def create_heatmaps(self, joints, mask):
 
@@ -41,7 +42,7 @@ class Heatmapper:
 
         self.put_limbs(heatmaps, joints)
 
-        heatmaps *= mask[:,:,None]
+        heatmaps *= mask
 
         return heatmaps
 

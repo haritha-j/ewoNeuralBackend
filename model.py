@@ -110,7 +110,7 @@ def apply_mask(x, mask1, mask2, num_p, stage, branch, np_branch1, np_branch2):
     w_name = "weight_stage%d_L%d" % (stage, branch)
 
     # TODO: we have branch number here why we made so strange check
-    assert np_branch1 != np_branch2 # we selecting branches by number of pafs, wf they accidentally became the same it will be disaster
+    assert np_branch1 != np_branch2 # we selecting branches by number of pafs, if they accidentally became the same it will be disaster
 
     if num_p == np_branch1:
         w = Multiply(name=w_name)([x, mask1])  # vec_weight

@@ -26,10 +26,18 @@ class CanonicalConfig:
 
 
         # this numbers probably copied from matlab they are 1.. based not 0.. based
-        self.limb_from = [2, 9,  10, 2,  12, 13, 2, 3, 4, 3,  2, 6, 7, 6,  2, 1,  1,  15, 16]
-        self.limb_to = [9, 10, 11, 12, 13, 14, 3, 4, 5, 17, 6, 7, 8, 18, 1, 15, 16, 17, 18]
-        self.limbs_conn = zip(self.limb_from, self.limb_to)
-        self.limbs_conn = [(fr - 1, to - 1) for (fr, to) in self.limbs_conn]
+        self.limb_from =  ['neck', 'Rhip', 'Rkne', 'neck', 'Lhip', 'Lkne', 'neck', 'Rsho', 'Relb', 'Rsho', 'neck', 'Lsho', 'Lelb', 'Lsho',
+         'neck', 'nose', 'nose', 'Reye', 'Leye']
+        self.limb_to = ['Rhip', 'Rkne', 'Rank', 'Lhip', 'Lkne', 'Lank', 'Rsho', 'Relb', 'Rwri', 'Rear', 'Lsho', 'Lelb', 'Lwri', 'Lear',
+         'nose', 'Reye', 'Leye', 'Rear', 'Lear']
+
+        self.limb_from = [ self.parts_dict[n] for n in self.limb_from ]
+        self.limb_to = [ self.parts_dict[n] for n in self.limb_to ]
+
+        assert self.limb_from == [x-1 for x in [2, 9,  10, 2,  12, 13, 2, 3, 4, 3,  2, 6, 7, 6,  2, 1,  1,  15, 16]]
+        assert self.limb_to == [x-1 for x in [9, 10, 11, 12, 13, 14, 3, 4, 5, 17, 6, 7, 8, 18, 1, 15, 16, 17, 18]]
+
+        self.limbs_conn = list(zip(self.limb_from, self.limb_to))
 
         self.paf_layers = 2*len(self.limbs_conn)
         self.heat_layers = self.num_parts
@@ -111,32 +119,22 @@ class COCOSourceConfig:
 
         return meta
 
+    def convert_mask(self, mask, global_config):
+
+        mask = np.repeat(mask[:,:,np.newaxis], global_config.num_layers, axis=2)
+        return mask
+
     def source(self):
 
         return self.hdf5_source
-
-class MPIISourceConfig:
-
-    def __init__(self, hdf5_source):
-
-        self.hdf5_source = hdf5_source
-        self.parts = ["HeadTop", "Neck", "RShoulder", "RElbow", "RWrist", "LShoulder", "LElbow", "LWrist", "RHip", "RKnee",
-             "RAnkle", "LHip", "LKnee", "LAnkle"]
-
-        self.numparts = len(parts)
-
-    def convert(self, meta, global_config):
-
-        #TODO: meta['scale_self']=meta['scale_self']*328/200
-        raise "Not implemented"
-
-
-Configs["Canonical"] = CanonicalConfig
 
 
 
 # more information on keypoints mapping is here
 # https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation/issues/7
+
+
+Configs["Canonical"] = CanonicalConfig
 
 
 def GetConfig(config_name):

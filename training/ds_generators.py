@@ -41,8 +41,8 @@ class DataIteratorBase:
 
         sample_idx = 0
         batches_x = np.empty(self.image_shape)
-        batches_x1 = np.zeros(self.mask1_shape)
-        batches_x2 = np.zeros(self.mask2_shape)
+        batches_x1 = np.empty(self.mask1_shape)
+        batches_x2 = np.empty(self.mask2_shape)
         batches_y1 = np.empty(self.ypafs1_shape)
         batches_y2 = np.empty(self.yheat2_shape)
 
@@ -55,8 +55,9 @@ class DataIteratorBase:
                 kpts = None
 
             batches_x[sample_idx] = data_img[np.newaxis, ...]
-            batches_x1[sample_idx,:,:,:] = mask_img[:,:,np.newaxis]
-            batches_x2[sample_idx,:,:,:] = mask_img[:,:,np.newaxis]
+
+            batches_x1[sample_idx,:,:,:] = mask_img[ np.newaxis, :, :, :self.split_point ]
+            batches_x2[sample_idx,:,:,:] = mask_img[ np.newaxis, :, :, self.split_point: ]
 
             batches_y1[sample_idx] = label[np.newaxis, :, :, :self.split_point ]
             batches_y2[sample_idx] = label[np.newaxis, :, :, self.split_point: ]
@@ -76,7 +77,7 @@ class DataIteratorBase:
                         batches_y1, batches_y2,
                         batches_y1, batches_y2]
 
-                # we should recreate this arrays becase we in multiple threads, can't overwrite
+                # we should recreate this arrays because we in multiple threads, can't overwrite
                 batches_x = np.empty(self.image_shape)
                 batches_x1 = np.empty(self.mask1_shape)
                 batches_x2 = np.empty(self.mask2_shape)
@@ -184,7 +185,7 @@ class DataIterator(DataIteratorBase):
         while True:
 
             if self.limit is not None and self.records > self.limit:
-                raise StopIteration
+                raise StopIteration("Limit Reached")
 
             tpl = next(self.generator, None)
             if tpl is not None:
@@ -195,6 +196,6 @@ class DataIterator(DataIteratorBase):
                 print("Staring next generator loop cycle")
                 self.generator = self.raw_data_iterator.gen()
             else:
-                raise StopIteration
+                raise StopIteration("Limited and reached cycle")
 
 
