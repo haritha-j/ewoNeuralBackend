@@ -94,8 +94,10 @@ class COCOSourceConfig:
 
         joints = np.array(meta['joints'])
 
+        assert joints.shape[1] == len(self.parts)
+
         result = np.zeros((joints.shape[0], global_config.num_parts, 3), dtype=np.float)
-        result[:,:,2]=2.  # 2 - abstent, 1 visible, 0 - invisible
+        result[:,:,2]=3.  # OURS - # 3 never marked up in this dataset, 2 - not marked up in this person, 1 - marked and visible, 0 - marked but invisible
 
         for p in self.parts:
             coco_id = self.parts_dict[p]
@@ -109,7 +111,10 @@ class COCOSourceConfig:
 
         # no neck in coco database, we calculate it as average of shoulders
         # TODO: we use 0 - hidden, 1 visible, 2 absent - it is not coco values they processed by generate_hdf5
-        both_shoulders_known = (joints[:, LshoC, 2]<2)  &  (joints[:, RshoC, 2]<2)
+        both_shoulders_known = (joints[:, LshoC, 2]<2)  &  (joints[:, RshoC, 2] < 2)
+
+        result[~both_shoulders_known, neckG, 2] = 2. # otherwise they will be 3. aka 'never marked in this dataset'
+
         result[both_shoulders_known, neckG, 0:2] = (joints[both_shoulders_known, RshoC, 0:2] +
                                                     joints[both_shoulders_known, LshoC, 0:2]) / 2
         result[both_shoulders_known, neckG, 2] = np.minimum(joints[both_shoulders_known, RshoC, 2],
@@ -155,7 +160,8 @@ def GetConfig(config_name):
         assert dct[y] is None
         dct[y] = name + ":y"
 
-    print(dct)
+    from pprint import pprint
+    pprint(dict(zip(range(len(dct)), dct)))
 
     return config
 

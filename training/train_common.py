@@ -23,9 +23,13 @@ gamma = 0.333
 stepsize = 121746 * 17  # in original code each epoch is 121746 and step change is on 17th epoch
 max_iter = 200
 
-def get_last_epoch_and_weights_file(WEIGHT_DIR, WEIGHTS_SAVE):
+def get_last_epoch_and_weights_file(WEIGHT_DIR, WEIGHTS_SAVE, epoch):
 
     os.makedirs(WEIGHT_DIR, exist_ok=True)
+
+    if epoch is not None: #override
+        return epoch,  WEIGHT_DIR + '/' + WEIGHTS_SAVE.format(epoch=epoch)
+
     files = [file for file in glob(WEIGHT_DIR + '/weights.*.h5')]
     files = [file.split('/')[-1] for file in files]
     epochs = [file.split('.')[1] for file in files if file]
@@ -45,7 +49,7 @@ def get_last_epoch_and_weights_file(WEIGHT_DIR, WEIGHTS_SAVE):
 # training/canonical/exp2
 # training/canonical_exp2.csv
 
-def prepare(config_name, exp_id, train_samples, val_samples, batch_size ):
+def prepare(config_name, exp_id, train_samples, val_samples, batch_size, epoch=None ):
 
     config = GetConfig(config_name)
 
@@ -62,7 +66,7 @@ def prepare(config_name, exp_id, train_samples, val_samples, batch_size ):
     lr_mult = get_lrmult(model)
 
     # load previous weights or vgg19 if this is the first run
-    last_epoch, wfile = get_last_epoch_and_weights_file(WEIGHT_DIR, WEIGHTS_SAVE)
+    last_epoch, wfile = get_last_epoch_and_weights_file(WEIGHT_DIR, WEIGHTS_SAVE, epoch)
 
     if wfile is not None:
         print("Loading %s ..." % wfile)
@@ -139,13 +143,13 @@ def train(model, train_di, val_di, iterations_per_epoch, validation_steps, last_
                         steps_per_epoch=iterations_per_epoch,
                         epochs=max_iter,
                         callbacks=callbacks_list,
-                        validation_data=val_di,
+                        validation_data=val_di,                  # TODO: restart validation iterator on each step
                         validation_steps=validation_steps,
                         use_multiprocessing=not use_client_gen,  # TODO: zmq hangups somewhere in threads. fix it.
                         initial_epoch=last_epoch
                         )
 
-def validate(model, val_di, validation_steps, use_client_gen):
+def validate(model, val_di, validation_steps, use_client_gen, epoch):
 
         loss = model.evaluate_generator(val_di,
                                         steps=validation_steps,
@@ -153,7 +157,7 @@ def validate(model, val_di, validation_steps, use_client_gen):
         print(loss)
 
 
-def validate_batch(model, val_di, validation_steps, metrics_id):
+def validate_batch(model, val_di, validation_steps, metrics_id, epoch):
 
     results = []
 
@@ -164,12 +168,20 @@ def validate_batch(model, val_di, validation_steps, metrics_id):
         print(loss)
         results += [loss]
 
-    np.savetxt(metrics_id + ".txt", np.array(results))
+    results = np.array(results)
+    np.savetxt("nn_score.%s.%04d.h5" % (metrics_id, epoch), results, fmt='%.4f',)
+    print(np.mean(results, axis=0))
 
 
-def save_network_input_output(model, val_di, validation_steps, metrics_id, batch_size):
 
-    h5 = h5py.File(metrics_id + ".h5", 'w')
+def save_network_input_output(model, val_di, validation_steps, metrics_id, batch_size, epoch=None):
+
+    if epoch is not None:
+        filename = "nn_io.%s.%04d.h5" % (metrics_id, epoch)
+    else:
+        filename = "nn_gt.%s.h5" % metrics_id
+
+    h5 = h5py.File(filename, 'w')
 
     for i in range(validation_steps):
         X, Y = next(val_di)

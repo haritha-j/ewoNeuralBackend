@@ -97,6 +97,9 @@ def process_image(image_rec, img_id, image_index, img_anns, dataset_type):
             pers["joint"][part, 0] = anno[part * 3]
             pers["joint"][part, 1] = anno[part * 3 + 1]
 
+            # visible/invisible
+            # COCO - Each keypoint has a 0-indexed location x,y and a visibility flag v defined as v=0: not labeled (in which case x=y=0), v=1: labeled but not visible, and v=2: labeled and visible.
+            # OURS - # 3 never marked up in this dataset, 2 - not marked up in this person, 1 - marked and visible, 0 - marked but invisible
             if anno[part * 3 + 2] == 2:
                 pers["joint"][part, 2] = 1
             elif anno[part * 3 + 2] == 1:

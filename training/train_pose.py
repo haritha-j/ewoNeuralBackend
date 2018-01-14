@@ -11,9 +11,11 @@ batch_size = 10
 task = sys.argv[1] if len(sys.argv)>1 else "train"
 config_name = sys.argv[2] if len(sys.argv)>2 else "Canonical"
 experiment_name = sys.argv[3] if len(sys.argv)>3 else None
+if experiment_name=='': experiment_name=None
+epoch = int(sys.argv[4]) if len(sys.argv)>4 else None
 
 model, iterations_per_epoch, validation_steps, last_epoch, metrics_id, callbacks_list = \
-    prepare(config_name=config_name, exp_id=experiment_name, train_samples = 117576, val_samples = 2475, batch_size=batch_size)
+    prepare(config_name=config_name, exp_id=experiment_name, train_samples = 117576, val_samples = 2475, batch_size=batch_size, epoch=epoch)
 
 config = GetConfig(config_name)
 
@@ -34,13 +36,13 @@ if task == "train":
     train(model, train_di, val_di, iterations_per_epoch, validation_steps, last_epoch, use_client_gen, callbacks_list)
 
 elif task == "validate":
-    validate(model, val_di, validation_steps, use_client_gen)
+    validate(model, val_di, validation_steps, use_client_gen, last_epoch)
 
 elif task == "validate_batch":
-    validate_batch(model, val_di, validation_steps, metrics_id)
+    validate_batch(model, val_di, validation_steps, metrics_id, last_epoch)
 
 elif task == "save_network_input_output":
-    save_network_input_output(model, val_di, validation_steps, metrics_id, batch_size)
+    save_network_input_output(model, val_di, validation_steps, metrics_id, batch_size, last_epoch)
 
 elif task == "save_network_input":
     save_network_input_output(None, val_di, validation_steps, metrics_id, batch_size)

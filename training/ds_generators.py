@@ -89,6 +89,9 @@ class DataIteratorBase:
     def keypoints(self):
         return self.keypoints
 
+    def num_samples(self):
+        assert False, "Not Implemented"
+
 
 class DataGeneratorClient(DataIteratorBase):
 
@@ -179,6 +182,8 @@ class DataIterator(DataIteratorBase):
         self.raw_data_iterator = RawDataIterator(global_config, config, shuffle=shuffle, augment=augment)
         self.generator = self.raw_data_iterator.gen()
 
+    def num_samples(self):
+        return self.raw_data_iterator.num_keys()
 
     def _recv_arrays(self):
 
