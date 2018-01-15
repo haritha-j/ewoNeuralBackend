@@ -69,13 +69,22 @@ class DataIteratorBase:
             if sample_idx == self.batch_size:
                 sample_idx = 0
 
-                yield [batches_x, batches_x1,  batches_x2], \
-                      [batches_y1, batches_y2,
-                        batches_y1, batches_y2,
-                        batches_y1, batches_y2,
-                        batches_y1, batches_y2,
-                        batches_y1, batches_y2,
-                        batches_y1, batches_y2]
+                if self.vec_num>0 and self.heat_num>0:
+                    yield [batches_x, batches_x1,  batches_x2], \
+                          [batches_y1, batches_y2,
+                            batches_y1, batches_y2,
+                            batches_y1, batches_y2,
+                            batches_y1, batches_y2,
+                            batches_y1, batches_y2,
+                            batches_y1, batches_y2]
+
+                elif self.vec_num == 0 and self.heat_num > 0:
+
+                    yield [batches_x, batches_x2], \
+                          [batches_y2, batches_y2, batches_y2, batches_y2, batches_y2, batches_y2]
+
+                else:
+                    assert False, "Wtf or not implemented"
 
                 # we should recreate this arrays because we in multiple threads, can't overwrite
                 batches_x = np.empty(self.image_shape)

@@ -135,8 +135,11 @@ def get_training_model(weight_decay, np_branch1, np_branch2, stages = 6, gpus = 
     heat_weight_input = Input(shape=heat_input_shape)
 
     inputs.append(img_input)
-    inputs.append(vec_weight_input)
-    inputs.append(heat_weight_input)
+    if np_branch1 > 0:
+        inputs.append(vec_weight_input)
+
+    if np_branch2 > 0:
+        inputs.append(heat_weight_input)
 
     #img_normalized = Lambda(lambda x: x / 256 - 0.5)(img_input) # [-0.5, 0.5]
     img_normalized = img_input # will be done on augmentation stage
@@ -145,33 +148,47 @@ def get_training_model(weight_decay, np_branch1, np_branch2, stages = 6, gpus = 
     stage0_out = vgg_block(img_normalized, weight_decay)
 
     # stage 1 - branch 1 (PAF)
-    stage1_branch1_out = stage1_block(stage0_out, np_branch1, 1, weight_decay)
-    w1 = apply_mask(stage1_branch1_out, vec_weight_input, heat_weight_input, np_branch1, 1, 1, np_branch1, np_branch2)
+    new_x = []
+    if np_branch1 > 0:
+        stage1_branch1_out = stage1_block(stage0_out, np_branch1, 1, weight_decay)
+        w1 = apply_mask(stage1_branch1_out, vec_weight_input, heat_weight_input, np_branch1, 1, 1, np_branch1, np_branch2)
+        outputs.append(w1)
+        new_x.append(stage1_branch1_out)
 
     # stage 1 - branch 2 (confidence maps)
-    stage1_branch2_out = stage1_block(stage0_out, np_branch2, 2, weight_decay)
-    w2 = apply_mask(stage1_branch2_out, vec_weight_input, heat_weight_input, np_branch2, 1, 2, np_branch1, np_branch2)
 
-    x = Concatenate()([stage1_branch1_out, stage1_branch2_out, stage0_out])
+    if np_branch2 > 0:
+        stage1_branch2_out = stage1_block(stage0_out, np_branch2, 2, weight_decay)
+        w2 = apply_mask(stage1_branch2_out, vec_weight_input, heat_weight_input, np_branch2, 1, 2, np_branch1, np_branch2)
+        outputs.append(w2)
+        new_x.append(stage1_branch2_out)
 
-    outputs.append(w1)
-    outputs.append(w2)
+    new_x.append(stage0_out)
+
+    x = Concatenate()(new_x)
 
     # stage sn >= 2
     for sn in range(2, stages + 1):
+
+        new_x = []
         # stage SN - branch 1 (PAF)
-        stageT_branch1_out = stageT_block(x, np_branch1, sn, 1, weight_decay)
-        w1 = apply_mask(stageT_branch1_out, vec_weight_input, heat_weight_input, np_branch1, sn, 1, np_branch1, np_branch2)
+        if np_branch1 > 0:
+            stageT_branch1_out = stageT_block(x, np_branch1, sn, 1, weight_decay)
+            w1 = apply_mask(stageT_branch1_out, vec_weight_input, heat_weight_input, np_branch1, sn, 1, np_branch1, np_branch2)
+            outputs.append(w1)
+            new_x.append(stageT_branch1_out)
 
         # stage SN - branch 2 (confidence maps)
-        stageT_branch2_out = stageT_block(x, np_branch2, sn, 2, weight_decay)
-        w2 = apply_mask(stageT_branch2_out, vec_weight_input, heat_weight_input, np_branch2, sn, 2, np_branch1, np_branch2)
+        if np_branch2 > 0:
+            stageT_branch2_out = stageT_block(x, np_branch2, sn, 2, weight_decay)
+            w2 = apply_mask(stageT_branch2_out, vec_weight_input, heat_weight_input, np_branch2, sn, 2, np_branch1, np_branch2)
+            outputs.append(w2)
+            new_x.append(stageT_branch2_out)
 
-        outputs.append(w1)
-        outputs.append(w2)
+        new_x.append(stage0_out)
 
         if sn < stages:
-            x = Concatenate()([stageT_branch1_out, stageT_branch2_out, stage0_out])
+            x = Concatenate()(new_x)
 
     model = Model(inputs=inputs, outputs=outputs)
     return model

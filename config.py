@@ -101,30 +101,33 @@ class COCOSourceConfig:
 
         for p in self.parts:
             coco_id = self.parts_dict[p]
-            global_id = global_config.parts_dict[p]
-            assert global_id!=1, "neck shouldn't be known yet"
-            result[:,global_id,:]=joints[:,coco_id,:]
 
-        neckG = global_config.parts_dict['neck']
-        RshoC = self.parts_dict['Rsho']
-        LshoC = self.parts_dict['Lsho']
+            if p in global_config.parts_dict:
+                global_id = global_config.parts_dict[p]
+                assert global_id!=1, "neck shouldn't be known yet"
+                result[:,global_id,:]=joints[:,coco_id,:]
 
-        # no neck in coco database, we calculate it as average of shoulders
-        # TODO: we use 0 - hidden, 1 visible, 2 absent - it is not coco values they processed by generate_hdf5
-        both_shoulders_known = (joints[:, LshoC, 2]<2)  &  (joints[:, RshoC, 2] < 2)
+        if 'neck' in global_config.parts_dict:
+            neckG = global_config.parts_dict['neck']
+            RshoC = self.parts_dict['Rsho']
+            LshoC = self.parts_dict['Lsho']
 
-        result[~both_shoulders_known, neckG, 2] = 2. # otherwise they will be 3. aka 'never marked in this dataset'
+            # no neck in coco database, we calculate it as average of shoulders
+            # TODO: we use 0 - hidden, 1 visible, 2 absent - it is not coco values they processed by generate_hdf5
+            both_shoulders_known = (joints[:, LshoC, 2]<2)  &  (joints[:, RshoC, 2] < 2)
 
-        result[both_shoulders_known, neckG, 0:2] = (joints[both_shoulders_known, RshoC, 0:2] +
-                                                    joints[both_shoulders_known, LshoC, 0:2]) / 2
-        result[both_shoulders_known, neckG, 2] = np.minimum(joints[both_shoulders_known, RshoC, 2],
-                                                                 joints[both_shoulders_known, LshoC, 2])
+            result[~both_shoulders_known, neckG, 2] = 2. # otherwise they will be 3. aka 'never marked in this dataset'
+
+            result[both_shoulders_known, neckG, 0:2] = (joints[both_shoulders_known, RshoC, 0:2] +
+                                                        joints[both_shoulders_known, LshoC, 0:2]) / 2
+            result[both_shoulders_known, neckG, 2] = np.minimum(joints[both_shoulders_known, RshoC, 2],
+                                                                     joints[both_shoulders_known, LshoC, 2])
 
         meta['joints'] = result
 
         return meta
 
-    def convert_mask(self, mask, global_config):
+    def convert_mask(self, mask, global_config, joints = None):
 
         mask = np.repeat(mask[:,:,np.newaxis], global_config.num_layers, axis=2)
         return mask

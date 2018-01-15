@@ -59,7 +59,7 @@ class RawDataIterator:
             assert mask.dtype == np.float, mask.dtype
 
             # we need layered mask on next stage
-            mask = self.configs[num].convert_mask(mask, self.global_config)
+            mask = self.configs[num].convert_mask(mask, self.global_config, joints = meta['joints'])
 
             # create heatmaps and pafs
             labels = self.heatmapper.create_heatmaps(meta['joints'], mask)
