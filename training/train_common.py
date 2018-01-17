@@ -182,15 +182,16 @@ def validate(config, model, val_client, validation_steps, metrics_id, epoch):
         m = calc_batch_metrics(i, GT, Y, range(config.heat_start, config.bkg_start))
         metrics.append(m)
         print("Validating[BATCH: %d] MAE: %0.4f, RMSE: %0.4f, DIST: %0.2f" % (i,m["MAE"].mean(), m["RMSE"].mean(),m["DIST"].mean()))
-        metrics = pd.concat(metrics)
-        metrics['epoch']=epoch
-        metrics.to_csv("logs/val_scores.%s.%04d.txt" % (metrics_id, epoch), sep="\t")
-        del metrics["batch"]
-        del metrics["item"]
-        del metrics["layer"]
-        metrics = metrics.groupby(["epoch"]).mean()
-        with open('%s.val.tsv' % metrics_id, 'a') as f:
-            metrics.to_csv(f, header=(epoch==1), sep="\t")
+
+    metrics = pd.concat(metrics)
+    metrics['epoch']=epoch
+    metrics.to_csv("logs/val_scores.%s.%04d.txt" % (metrics_id, epoch), sep="\t")
+    del metrics["batch"]
+    del metrics["item"]
+    del metrics["layer"]
+    metrics = metrics.groupby(["epoch"]).mean()
+    with open('%s.val.tsv' % metrics_id, 'a') as f:
+        metrics.to_csv(f, header=(epoch==1), sep="\t")
 
 
 def save_network_input_output(model, val_di, validation_steps, metrics_id, batch_size, epoch=None):
