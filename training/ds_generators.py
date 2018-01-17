@@ -30,8 +30,13 @@ class DataIteratorBase:
 
         #self.keypoints = [None]*self.batch_size # this is never passed to NN, will be accessed by accuracy calculation
 
+    def restart(self):
+
+        assert False, "Not implemented"  # should restart connection, server should start new cycle on connection.
 
     def gen_raw(self): # this function used for test purposes in py_rmpe_server
+
+        self.restart()
 
         while True:
             yield tuple(self._recv_arrays())
@@ -187,8 +192,17 @@ class DataIterator(DataIteratorBase):
 
         self.limit = limit
         self.records = 0
+        self.global_config = global_config
+        self.config = config
+        self.shuffle = shuffle
+        self.augment = augment
 
-        self.raw_data_iterator = RawDataIterator(global_config, config, shuffle=shuffle, augment=augment)
+        self.raw_data_iterator = RawDataIterator(self.global_config, self.config, shuffle=self.shuffle, augment=self.augment)
+        self.generator = None
+
+    def restart(self):
+
+        self.records = 0
         self.generator = self.raw_data_iterator.gen()
 
     def num_samples(self):
@@ -206,10 +220,6 @@ class DataIterator(DataIteratorBase):
                 self.records += 1
                 return tpl
 
-            if self.limit is None or self.records < self.limit:
-                print("Staring next generator loop cycle")
-                self.generator = self.raw_data_iterator.gen()
-            else:
-                raise StopIteration("Limited and reached cycle")
+            raise StopIteration("Limited and reached cycle")
 
 

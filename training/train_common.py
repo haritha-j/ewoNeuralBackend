@@ -4,6 +4,7 @@ import math
 sys.path.append("..")
 
 import numpy as np
+import pandas as pd
 
 from model import get_training_model, get_lrmult
 from training.optimizers import MultiSGD
@@ -14,6 +15,8 @@ import keras.backend as K
 from glob import glob
 from config import GetConfig
 import h5py
+from testing.inhouse_metric import calc_batch_metrics
+
 
 base_lr = 2e-5
 momentum = 0.9
@@ -27,8 +30,8 @@ def get_last_epoch_and_weights_file(WEIGHT_DIR, WEIGHTS_SAVE, epoch):
 
     os.makedirs(WEIGHT_DIR, exist_ok=True)
 
-    if epoch is not None: #override
-        return epoch,  WEIGHT_DIR + '/' + WEIGHTS_SAVE.format(epoch=epoch)
+    if epoch is not None and epoch != '': #override
+        return int(epoch),  WEIGHT_DIR + '/' + WEIGHTS_SAVE.format(epoch=epoch)
 
     files = [file for file in glob(WEIGHT_DIR + '/weights.*.h5')]
     files = [file.split('/')[-1] for file in files]
@@ -49,9 +52,7 @@ def get_last_epoch_and_weights_file(WEIGHT_DIR, WEIGHTS_SAVE, epoch):
 # training/canonical/exp2
 # training/canonical_exp2.csv
 
-def prepare(config_name, exp_id, train_samples, val_samples, batch_size, epoch=None ):
-
-    config = GetConfig(config_name)
+def prepare(config, config_name, exp_id, train_samples, val_samples, batch_size, epoch=None ):
 
     metrics_id = config_name + "_" + exp_id if exp_id is not None else config_name
     weights_id = config_name + "/" + exp_id if exp_id is not None else config_name
@@ -67,6 +68,7 @@ def prepare(config_name, exp_id, train_samples, val_samples, batch_size, epoch=N
 
     # load previous weights or vgg19 if this is the first run
     last_epoch, wfile = get_last_epoch_and_weights_file(WEIGHT_DIR, WEIGHTS_SAVE, epoch)
+    print("last_epoch:",last_epoch)
 
     if wfile is not None:
         print("Loading %s ..." % wfile)
@@ -137,41 +139,58 @@ def prepare(config_name, exp_id, train_samples, val_samples, batch_size, epoch=N
 
 
 
-def train(model, train_di, val_di, iterations_per_epoch, validation_steps, last_epoch, use_client_gen, callbacks_list):
+def train(config, model, train_client, val_client, iterations_per_epoch, validation_steps, metrics_id, last_epoch, use_client_gen, callbacks_list):
 
-    model.fit_generator(train_di,
-                        steps_per_epoch=iterations_per_epoch,
-                        epochs=max_iter,
-                        callbacks=callbacks_list,
-                        validation_data=val_di,                  # TODO: restart validation iterator on each step
-                        validation_steps=validation_steps,
-                        use_multiprocessing=not use_client_gen,  # TODO: zmq hangups somewhere in threads. fix it.
-                        initial_epoch=last_epoch
-                        )
+    train_di = train_client.gen()
 
-def validate(model, val_di, validation_steps, use_client_gen, epoch):
+    for epoch in range(last_epoch, max_iter):
 
-        loss = model.evaluate_generator(val_di,
-                                        steps=validation_steps,
-                                        use_multiprocessing=not use_client_gen)
-        print(loss)
+        # train for one iteration
+        model.fit_generator(train_di,
+                            steps_per_epoch=iterations_per_epoch,
+                            epochs=epoch+1,
+                            callbacks=callbacks_list,
+                            use_multiprocessing=False,  # TODO: if you set True touching generator from 2 threads will stuck the program
+                            initial_epoch=epoch
+                            )
+
+        validate(config, model, val_client, validation_steps, metrics_id, epoch+1)
 
 
-def validate_batch(model, val_di, validation_steps, metrics_id, epoch):
+def validate(config, model, val_client, validation_steps, metrics_id, epoch):
 
-    results = []
+    val_di = val_client.gen()
 
     for i in range(validation_steps):
-        X, Y = next(val_di)
 
-        loss = model.test_on_batch(X, Y)
-        print(loss)
-        results += [loss]
+        metrics = []
 
-    results = np.array(results)
-    np.savetxt("nn_score.%s.%04d.h5" % (metrics_id, epoch), results, fmt='%.4f',)
-    print(np.mean(results, axis=0))
+        X, GT = next(val_di)
 
+        Y = model.predict(X)
+
+        if config.paf_layers > 0 and config.heat_layers > 0:
+            GT = np.concatenate([GT[-2], GT[-1]], axis=3)
+            Y = np.concatenate([Y[-2], Y[-1]], axis=3)
+
+        elif config.paf_layers == 0 and config.heat_layers > 0:
+            GT = GT[-1]
+            Y = Y[-1]
+        else:
+            assert False, "Wtf or not implemented"
+
+        m = calc_batch_metrics(i, GT, Y, range(config.heat_start, config.bkg_start))
+        metrics.append(m)
+        print("Validating[BATCH: %d] MAE: %0.4f, RMSE: %0.4f, DIST: %0.2f" % (i,m["MAE"].mean(), m["RMSE"].mean(),m["DIST"].mean()))
+        metrics = pd.concat(metrics)
+        metrics['epoch']=epoch
+        metrics.to_csv("logs/val_scores.%s.%04d.txt" % (metrics_id, epoch), sep="\t")
+        del metrics["batch"]
+        del metrics["item"]
+        del metrics["layer"]
+        metrics = metrics.groupby(["epoch"]).mean()
+        with open('%s.val.tsv' % metrics_id, 'a') as f:
+            metrics.to_csv(f, header=(epoch==1), sep="\t")
 
 
 def save_network_input_output(model, val_di, validation_steps, metrics_id, batch_size, epoch=None):
