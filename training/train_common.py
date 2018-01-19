@@ -194,7 +194,9 @@ def validate(config, model, val_client, validation_steps, metrics_id, epoch):
         metrics.to_csv(f, header=(epoch==1), sep="\t")
 
 
-def save_network_input_output(model, val_di, validation_steps, metrics_id, batch_size, epoch=None):
+def save_network_input_output(model, val_client, validation_steps, metrics_id, batch_size, epoch=None):
+
+    val_di = val_client.gen()
 
     if epoch is not None:
         filename = "nn_io.%s.%04d.h5" % (metrics_id, epoch)
