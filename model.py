@@ -227,7 +227,7 @@ def get_lrmult(model):
     return lr_mult
 
 
-def get_testing_model():
+def get_testing_model(np_branch1, np_branch2, stages = 6):
 
     img_input_shape = (None, None, 3)
 
@@ -238,23 +238,36 @@ def get_testing_model():
     # VGG
     stage0_out = vgg_block(img_normalized, None)
 
+    stages_out = []
+
     # stage 1 - branch 1 (PAF)
-    stage1_branch1_out = stage1_block(stage0_out, np_branch1, 1, None)
+    if np_branch1 > 0:
+        stage1_branch1_out = stage1_block(stage0_out, np_branch1, 1, None)
+        stages_out.append(stage1_branch1_out)
 
     # stage 1 - branch 2 (confidence maps)
-    stage1_branch2_out = stage1_block(stage0_out, np_branch2, 2, None)
+    if np_branch2 > 0:
+        stage1_branch2_out = stage1_block(stage0_out, np_branch2, 2, None)
+        stages_out.append(stage1_branch2_out)
 
-    x = Concatenate()([stage1_branch1_out, stage1_branch2_out, stage0_out])
+    x = Concatenate()(stages_out + [stage0_out])
 
     # stage t >= 2
     stageT_branch1_out = None
     stageT_branch2_out = None
     for sn in range(2, stages + 1):
-        stageT_branch1_out = stageT_block(x, np_branch1, sn, 1, None)
-        stageT_branch2_out = stageT_block(x, np_branch2, sn, 2, None)
 
-        if (sn < stages):
-            x = Concatenate()([stageT_branch1_out, stageT_branch2_out, stage0_out])
+        stages_out = []
+
+        if np_branch1 > 0:
+            stageT_branch1_out = stageT_block(x, np_branch1, sn, 1, None)
+            stages_out.append(stageT_branch1_out)
+        if np_branch2 > 0:
+            stageT_branch2_out = stageT_block(x, np_branch2, sn, 2, None)
+            stages_out.append(stageT_branch2_out)
+
+        if sn < stages:
+            x = Concatenate()(stages_out + [stage0_out])
 
     model = Model(inputs=[img_input], outputs=[stageT_branch1_out, stageT_branch2_out])
 

@@ -16,7 +16,7 @@ from glob import glob
 from config import GetConfig
 import h5py
 from testing.inhouse_metric import calc_batch_metrics
-
+from time import time
 
 base_lr = 2e-5
 momentum = 0.9
@@ -226,3 +226,15 @@ def save_network_input_output(model, val_client, validation_steps, metrics_id, b
         print(i)
 
     h5.close()
+
+def test_augmentation_speed(train_client):
+
+    train_di = train_client.gen()
+
+    start = time()
+    batch = 0
+
+    for X, Y in train_di:
+
+        batch +=1
+        print("batches per second ", batch/(time()-start))

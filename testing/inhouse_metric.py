@@ -26,7 +26,7 @@ def find_peaks(layer, thre1=0.01):
 def assign_peaks(layer_y, layer_gt):
 
     if len(layer_y) == 0 and len(layer_gt) == 0:
-        return 0
+        return np.nan
 
     if len(layer_y) == 0 or len(layer_gt) == 0:
         return 400
@@ -64,9 +64,10 @@ def calc_batch_metrics(batch_no, gt, Y, heatmap_layers):
     RMSE = np.sqrt(RMSE)
 
 
-    gt_parts = np.zeros((gt.shape[0], gt.shape[3]), dtype=np.integer)
-    y_parts = np.zeros((gt.shape[0], gt.shape[3]), dtype=np.integer)
-    y_dist = np.zeros((gt.shape[0], gt.shape[3]), dtype=np.float)
+    gt_parts = np.full((gt.shape[0], gt.shape[3]), np.nan)
+    y_parts = np.full((gt.shape[0], gt.shape[3]), np.nan)
+    y_dist = np.full((gt.shape[0], gt.shape[3]), np.nan)
+
 
     for n in range(gt.shape[0]):
         for l in heatmap_layers:

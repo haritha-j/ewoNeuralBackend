@@ -1,7 +1,7 @@
 import sys
 sys.path.append("..")
 
-from training.train_common import prepare, train, validate, save_network_input_output
+from training.train_common import prepare, train, validate, save_network_input_output, test_augmentation_speed
 from training.ds_generators import DataGeneratorClient, DataIterator
 from config import COCOSourceConfig, GetConfig
 
@@ -39,3 +39,6 @@ elif task == "save_network_input_output":
 
 elif task == "save_network_input":
     save_network_input_output(None, val_client, validation_steps, metrics_id, batch_size)
+
+elif task == "test_augmentation_speed":
+    test_augmentation_speed(train_client)
