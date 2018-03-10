@@ -4,7 +4,8 @@ This fork contains **pure python version** of [Realtime Multi-Person Pose Estima
 
 I this fork I've reimplemented images argumentation in pure python, it is significanly shorter(**285** lines vs **1202** lines in Michal Faber's C++ **rmpe_server**, and way less than in original work)
 
-Despite of Python language this code is **significantly faster** than original implementation(140 images/s vs 30 images/s C++ code on my machine). This is not really useful since most of people doesn't have 5 GPUs, but has large hack value. The magic is in combining all affine transformations to one matrix, and calling single **warpAffine**, and vectorized numpy computation of PAFs and Heatmaps.
+Despite of Python language this code is **significantly faster** than original implementation(140 images/s vs 30 images/s C++ code on my machine). This is not really useful since most of people don't have 5 GPUs, but just to prove the point python programs could be fast. The magic is in combining all affine transformations to one matrix, and calling single **warpAffine**, and vectorized numpy computation of PAFs and Heatmaps.
+
 
 Could be run as iterator inside **train_pose.py** (default), or as separate **./rmpe_server.py**
 
