@@ -160,39 +160,54 @@ def train(config, model, train_client, val_client, iterations_per_epoch, validat
 def validate(config, model, val_client, validation_steps, metrics_id, epoch):
 
     val_di = val_client.gen()
+    from keras.utils import GeneratorEnqueuer
+
+    val_thre = GeneratorEnqueuer(val_di)
+    val_thre.start()
+
+    model_metrics = []
+    inhouse_metrics = []
 
     for i in range(validation_steps):
 
-        metrics = []
-
-        X, GT = next(val_di)
+        X, GT = next(val_thre.get())
 
         Y = model.predict(X)
 
-        if config.paf_layers > 0 and config.heat_layers > 0:
-            GT = np.concatenate([GT[-2], GT[-1]], axis=3)
-            Y = np.concatenate([Y[-2], Y[-1]], axis=3)
+        model_losses = [ (np.sum((gt - y) ** 2) / gt.shape[0] / 2) for gt, y in zip(GT,Y) ]
+        mm = sum(model_losses)
 
+        if config.paf_layers > 0 and config.heat_layers > 0:
+            GTL6 = np.concatenate([GT[-2], GT[-1]], axis=3)
+            YL6 = np.concatenate([Y[-2], Y[-1]], axis=3)
+            mm6l1 = model_losses[-2]
+            mm6l2 = model_losses[-1]
         elif config.paf_layers == 0 and config.heat_layers > 0:
-            GT = GT[-1]
-            Y = Y[-1]
+            GTL6 = GT[-1]
+            YL6 = Y[-1]
+            mm6l1 = None
+            mm6l2 = model_losses[-1]
         else:
             assert False, "Wtf or not implemented"
 
-        m = calc_batch_metrics(i, GT, Y, range(config.heat_start, config.bkg_start))
-        metrics.append(m)
-        print("Validating[BATCH: %d] MAE: %0.4f, RMSE: %0.4f, DIST: %0.2f" % (i,m["MAE"].mean(), m["RMSE"].mean(),m["DIST"].mean()))
+        m = calc_batch_metrics(i, GTL6, YL6, range(config.heat_start, config.bkg_start))
+        inhouse_metrics += [m]
 
-    metrics = pd.concat(metrics)
-    metrics['epoch']=epoch
-    metrics.to_csv("logs/val_scores.%s.%04d.txt" % (metrics_id, epoch), sep="\t")
-    del metrics["batch"]
-    del metrics["item"]
-    del metrics["layer"]
-    metrics = metrics.groupby(["epoch"]).mean()
+        model_metrics += [ (i, mm, mm6l1, mm6l2, m["MAE"].sum()/GTL6.shape[0], m["RMSE"].sum()/GTL6.shape[0], m["DIST"].mean()) ]
+        print("Validating[BATCH: %d] LOSS: %0.4f, S6L1: %0.4f, S6L2: %0.4f, MAE: %0.4f, RMSE: %0.4f, DIST: %0.2f" % model_metrics[-1] )
+
+    inhouse_metrics = pd.concat(inhouse_metrics)
+    inhouse_metrics['epoch']=epoch
+    inhouse_metrics.to_csv("logs/val_scores.%s.%04d.txt" % (metrics_id, epoch), sep="\t")
+
+    model_metrics = pd.DataFrame(model_metrics, columns=("batch","loss","stage6l1","stage6l2","mae","rmse","dist") )
+    model_metrics['epoch']=epoch
+    del model_metrics['batch']
+    model_metrics = model_metrics.groupby('epoch').mean()
     with open('%s.val.tsv' % metrics_id, 'a') as f:
-        metrics.to_csv(f, header=(epoch==1), sep="\t")
+        model_metrics.to_csv(f, header=(epoch==1), sep="\t", float_format='%.4f')
 
+    val_thre.stop()
 
 def save_network_input_output(model, val_client, validation_steps, metrics_id, batch_size, epoch=None):
 

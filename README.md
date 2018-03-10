@@ -1,28 +1,26 @@
 ### About this fork
 
-This fork contains pure python version of **rmpe_dataset_server**. 
-It have less code(19kb vs 35kb), and significantly faster (140 images/s vs 30 images/s C++ code on my machine)
-Could be run as iterator inside **train_pose.py** (default), or as **./rmpe_server.py** 
+This fork contains **pure python version** of [Realtime Multi-Person Pose Estimation](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation). Initially it was forked from [Michal Faber fork](https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation), all credit for porting original work to Keras goes to him.
+
+I this fork I've reimplemented images argumentation in pure python, it is significanly shorter(**285** lines vs **1202** lines in Michal Faber's C++ **rmpe_server**, and way less than in original work)
+
+Despite of Python language this code is **significantly faster** than original implementation(140 images/s vs 30 images/s C++ code on my machine). This is not really useful since most of people doesn't have 5 GPUs, but has large hack value. The magic is in combining all affine transformations to one matrix, and calling single **warpAffine**, and vectorized numpy computation of PAFs and Heatmaps.
+
+Could be run as iterator inside **train_pose.py** (default), or as separate **./rmpe_server.py**
 
 #### Current status
 - [x] image augmentation: rotate, shift, scale, crop, flip (implemented as single affine transform, i.e. much faster)
 - [x] mask calculation: rotate, shift, scale, crop, flip
 - [x] joint heatmaps
 - [x] limbs part affinity fields
-- [x] tested using rmpe_server_tester.py, found some differences from C++ version, but looks like it is C++ code is buggy 
+- [x] quality is same as original work and bit better than Michal's version.
 
-
-#### How to help
-- re-generate val_dataset.h5 with new version of generate_hdf5.py (will be backward compatible, just one attribute 'meta' added)
-- since augmentation is very fast now, by default it works inside train_pose.py (separate thread)  
-- if you want to run external augmentation server run ./rmpe_server.py and change use_client_gen = True in train_pose.py    
-- test result with **inspect_dataset.ipynb** or **rmpe_server_tester.py raw save** (saves all images, heatmaps and PAFs to disk)  
-- look to the code and give feedback
-- try to train
+#### Current work
+- [ ] Ability to easily modify config and train different models. See addins submodule for head detector example and example how to add new datasets(MPII, Brainwash)
 
 
 # Realtime Multi-Person Pose Estimation
-This is a keras version of [Realtime Multi-Person Pose Estimation](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) project
+This is a keras version of  project
 
 ## Introduction
 Code repo for reproducing [2017 CVPR](https://arxiv.org/abs/1611.08050) paper using keras.  
@@ -30,13 +28,13 @@ Code repo for reproducing [2017 CVPR](https://arxiv.org/abs/1611.08050) paper us
 ## Results
 
 <p align="center">
-<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/dance.gif", width="720">
+<img src="https://github.com/anatolix/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/dance.gif", width="720">
 </p>
 
 <div align="center">
-<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/sample_images/ski.jpg", width="300", height="300">
+<img src="https://github.com/anatolix/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/sample_images/ski.jpg", width="300", height="300">
 &nbsp;
-<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/result.png", width="300", height="300">
+<img src="https://github.com/anatolix/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/result.png", width="300", height="300">
 </div>
 
 
