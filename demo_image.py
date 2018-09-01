@@ -244,7 +244,7 @@ if __name__ == '__main__':
 
     # authors of original model don't use
     # vgg normalization (subtracting mean) on input images
-    model = get_testing_model()
+    model = get_testing_model(1,1)
     model.load_weights(keras_weights_file)
 
     # load config
