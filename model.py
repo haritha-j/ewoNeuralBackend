@@ -11,7 +11,7 @@ import re
 
 
 #stages = 6
-#np_branch1 = 38
+np_branch1 = 38
 #np_branch2 = 19
 
 def relu(x): return Activation('relu')(x)
